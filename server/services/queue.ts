@@ -72,6 +72,7 @@ const queueColumns = {
   suspicious: deals.suspicious,
   reasons: deals.reasons,
   score: deals.score,
+  intro: deals.intro,
   themeId: themes.id,
   themeName: themes.name,
   channelId: channels.id,
@@ -286,7 +287,7 @@ export async function acceptReview(db: Db, id: string, ctx: QueueContext) {
   const rendered = renderMessage(
     format,
     await resolveTemplate(db, theme.id, format),
-    messageDataFrom(fresh, evaluation, ctx.timezone),
+    messageDataFrom(fresh, evaluation, ctx.timezone, item.intro),
   )
   await setStatus(db, id, item.status, {
     text: rendered.text,

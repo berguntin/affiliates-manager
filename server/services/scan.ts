@@ -8,6 +8,7 @@ import { computeExpiresAt } from '../domain/publication'
 import type { Db } from '../utils/db'
 import { schema } from '../utils/db'
 import type { Channel } from './channels'
+import { generateIntros, type Copywriter } from './copywriter'
 import { markManualProductsConsumed } from './manual-products'
 import { getPriceHistoryProvider, getProvider } from './providers'
 import type { RunLog } from './runs'
@@ -30,18 +31,22 @@ export const FORMAT_BY_CHANNEL: Record<ChannelType, MessageFormat> = {
 export interface ScanOptions {
   now?: number
   timezone: string
+  /** Redacción de entradillas con IA; sin él, solo plantilla. */
+  copywriter?: Copywriter
 }
 
 export function messageDataFrom(
   snapshot: ProductSnapshot,
   evaluation: Pick<DealEvaluation, 'effectiveDiscountPct' | 'reliability'>,
   timezone: string,
+  intro: string | null = null,
 ): MessageData {
   const offer = snapshot.offer
   return {
     title: snapshot.title,
     brand: snapshot.brand,
     note: snapshot.note || null,
+    intro,
     link: snapshot.detailPageUrl,
     timezone,
     price: offer
@@ -181,6 +186,27 @@ export async function scanTheme(
     }
   }
 
+  // Una entradilla por oferta, compartida por todos sus canales.
+  const intros = options.copywriter
+    ? await generateIntros(
+        options.copywriter,
+        selected.map(({ snapshot }) => ({
+          key: snapshot.asin,
+          input: { title: snapshot.title, brand: snapshot.brand, themeName: theme.name, tone: theme.tone },
+        })),
+      )
+    : new Map()
+  const introErrors = new Map<string, number>()
+  for (const result of intros.values()) {
+    log.count(result.source === 'ia' ? 'entradillas_ia' : 'entradillas_plantilla')
+    if (result.source === 'plantilla' && result.error) {
+      introErrors.set(result.reason, (introErrors.get(result.reason) ?? 0) + 1)
+    }
+  }
+  for (const [reason, n] of introErrors) {
+    log.error(`${label}: entradilla con IA no disponible en ${n} oferta(s), se usa la plantilla: ${reason}`)
+  }
+
   const templates = new Map<MessageFormat, string>()
   for (const format of new Set(channels.map((c) => FORMAT_BY_CHANNEL[c.type]))) {
     templates.set(format, await resolveTemplate(db, theme.id, format))
@@ -190,13 +216,14 @@ export async function scanTheme(
   let created = 0
   for (const { snapshot, evaluation } of selected) {
     const dealId = crypto.randomUUID()
+    const intro = intros.get(snapshot.asin)?.intro ?? null
     const offer = snapshot.offer
     const pubs = []
     for (const channel of channels) {
       const fresh = freshByChannel.get(channel.id)?.get(snapshot.asin)
       if (!fresh) continue
       const format = FORMAT_BY_CHANNEL[channel.type]
-      const rendered = renderMessage(format, templates.get(format)!, messageDataFrom(fresh, evaluation, options.timezone))
+      const rendered = renderMessage(format, templates.get(format)!, messageDataFrom(fresh, evaluation, options.timezone, intro))
       for (const warning of rendered.warnings) log.error(`${label} (${channel.name}): ${warning}`)
       pubs.push(
         db.insert(publications).values({
@@ -235,6 +262,7 @@ export async function scanTheme(
         suspicious: evaluation.suspicious,
         reasons: evaluation.notes,
         score: evaluation.score,
+        intro,
       }),
       ...pubs,
     )

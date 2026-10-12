@@ -128,6 +128,8 @@ export const deals = sqliteTable(
     suspicious: integer('suspicious', { mode: 'boolean' }).notNull().default(false),
     reasons: jsonList('reasons'),
     score: integer('score').notNull().default(0),
+    /** Entradilla redactada por IA (texto propio, validado). null = solo plantilla. */
+    intro: text('intro'),
     purgedAt: timestamp('purged_at'),
   },
   (t) => [

@@ -8,6 +8,7 @@ export interface AppEnv {
   AUTH_AUDIENCE?: string
   AUTH_ALLOWED_EMAILS?: string
   TELEGRAM_BOT_TOKEN?: string
+  ANTHROPIC_API_KEY?: string
 }
 
 /**

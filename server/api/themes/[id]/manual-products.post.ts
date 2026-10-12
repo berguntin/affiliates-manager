@@ -4,6 +4,7 @@ import { addManualProduct } from '../../../services/manual-products'
 import { withRun } from '../../../services/runs'
 import { scanTheme } from '../../../services/scan'
 import { getTheme } from '../../../services/themes'
+import { createCopywriter } from '../../../services/copywriter'
 
 /** Alta manual: guarda el producto y crea la candidata al momento. */
 export default defineEventHandler(async (event) => {
@@ -27,7 +28,7 @@ export default defineEventHandler(async (event) => {
     internalPriceCents: input.internalPriceCents,
   })
   const { result, runId } = await withRun(db, 'scan', 'manual', themeId, (log) =>
-    scanTheme(db, theme, log, { timezone: useTimezone() }),
+    scanTheme(db, theme, log, { timezone: useTimezone(), copywriter: createCopywriter(useEnv()) }),
   )
   const run = (await db.query.runs.findFirst({ where: (r, { eq }) => eq(r.id, runId) }))!
   setResponseStatus(event, 201)
