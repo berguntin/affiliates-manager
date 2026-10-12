@@ -19,6 +19,7 @@ export const TEMPLATE_VARIABLES = [
   'enlace',
   'descuento',
   'precio_anterior',
+  'pvp_recomendado',
   'oferta_flash',
   'bloque_precio',
 ] as const
@@ -39,6 +40,8 @@ export interface MessageData {
   price: {
     priceCents: number
     savingBasisCents: number | null
+    /** El precio de referencia es el PVP recomendado (no un precio anterior real). */
+    basisIsListPrice: boolean
     /** Descuento a mostrar (el efectivo calculado). */
     discountPct: number | null
     dealBadge: string | null
@@ -117,16 +120,19 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
   const warnings = validateTemplate(template, TEMPLATE_VARIABLES)
   const block = priceBlock(data, rules)
 
+  const basis =
+    data.price?.savingBasisCents && data.price.savingBasisCents > data.price.priceCents
+      ? data.price.savingBasisCents
+      : null
   const values: TemplateValues = {
     titulo: truncate(data.title, TITLE_MAX),
     marca: data.brand,
     nota: data.note,
     enlace: data.link,
     descuento: data.price?.discountPct && data.price.discountPct > 0 ? data.price.discountPct : null,
-    precio_anterior:
-      data.price?.savingBasisCents && data.price.savingBasisCents > data.price.priceCents
-        ? formatEuros(data.price.savingBasisCents)
-        : null,
+    // «antes» solo con un precio anterior real; el PVP recomendado se rotula como tal
+    precio_anterior: basis && !data.price?.basisIsListPrice ? formatEuros(basis) : null,
+    pvp_recomendado: basis && data.price?.basisIsListPrice ? formatEuros(basis) : null,
     oferta_flash: data.price?.dealBadge ?? null,
   }
 

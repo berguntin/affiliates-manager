@@ -5,7 +5,7 @@ export const DEFAULT_TEMPLATES: Record<MessageFormat, string> = {
   'telegram-html': `{{#oferta_flash}}⚡ <b>{{oferta_flash}}</b>
 {{/oferta_flash}}🛍️ <b>{{titulo}}</b>
 {{#marca}}🏷️ {{marca}}
-{{/marca}}{{#descuento}}🔻 <b>-{{descuento}}%</b>{{#precio_anterior}} (antes {{precio_anterior}}){{/precio_anterior}}
+{{/marca}}{{#descuento}}🔻 <b>-{{descuento}}%</b>{{#precio_anterior}} (antes {{precio_anterior}}){{/precio_anterior}}{{#pvp_recomendado}} (PVP rec. {{pvp_recomendado}}){{/pvp_recomendado}}
 {{/descuento}}{{#nota}}
 {{nota}}
 {{/nota}}
@@ -15,7 +15,7 @@ export const DEFAULT_TEMPLATES: Record<MessageFormat, string> = {
   whatsapp: `{{#oferta_flash}}⚡ *{{oferta_flash}}*
 {{/oferta_flash}}🛍️ *{{titulo}}*
 {{#marca}}🏷️ {{marca}}
-{{/marca}}{{#descuento}}🔻 *-{{descuento}}%*{{#precio_anterior}} (antes {{precio_anterior}}){{/precio_anterior}}
+{{/marca}}{{#descuento}}🔻 *-{{descuento}}%*{{#precio_anterior}} (antes {{precio_anterior}}){{/precio_anterior}}{{#pvp_recomendado}} (PVP rec. {{pvp_recomendado}}){{/pvp_recomendado}}
 {{/descuento}}{{#nota}}
 {{nota}}
 {{/nota}}

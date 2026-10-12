@@ -20,7 +20,14 @@ const withPrice: MessageData = {
   brand: 'Dodot',
   note: null,
   link,
-  price: { priceCents: 1999, savingBasisCents: 2999, discountPct: 33, dealBadge: null, checkedAt },
+  price: {
+    priceCents: 1999,
+    savingBasisCents: 2999,
+    basisIsListPrice: false,
+    discountPct: 33,
+    dealBadge: null,
+    checkedAt,
+  },
   timezone: 'Europe/Madrid',
 }
 
@@ -79,6 +86,13 @@ describe('renderMessage', () => {
     expect(text).not.toContain('🔻')
     expect(text).toContain(`_${LEGAL.affiliate}_`)
     expect(checkRequiredElements(text, { link, withPrice: false })).toEqual([])
+  })
+
+  it('rotula el PVP recomendado como tal y no como «antes»', () => {
+    const list = { ...withPrice, price: { ...withPrice.price!, basisIsListPrice: true } }
+    const { text } = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, list)
+    expect(text).toContain(`(PVP rec. ${eur('29,99')})`)
+    expect(text).not.toContain('antes')
   })
 
   it('añade bloque de precio y enlace aunque la plantilla los omita', () => {
