@@ -207,7 +207,7 @@ async function remove() {
           <UFormField
             label="Tono del mensaje"
             name="tone"
-            help="Se usará para la redacción con IA (fase 2)."
+            help="Lo sigue la IA al redactar la entradilla (con ANTHROPIC_API_KEY configurada)."
           >
             <UTextarea v-model="state.tone" :rows="2" placeholder="Cercano, para madres y padres primerizos" class="w-full" />
           </UFormField>

@@ -9,12 +9,16 @@ const bodySchema = z.object({
 })
 
 /** Vista previa de una plantilla con un producto de ejemplo. */
+const SAMPLE_INTRO = '¡Atentos, familias! Este os va a interesar 👀'
+
 export default defineEventHandler(async (event) => {
   const { format, body, withPrice } = await readValidated(event, bodySchema)
   return renderMessage(format, body, {
     title: 'Cochecito de bebé plegable ultraligero con capota',
     brand: 'Marca',
     note: withPrice ? null : 'Texto propio del alta manual',
+    // Solo si la IA está activa; si no, el mensaje real sale sin entradilla.
+    intro: useEnv().ANTHROPIC_API_KEY ? SAMPLE_INTRO : null,
     link: 'https://www.amazon.es/dp/B0MOCK0003?tag=micanal-21',
     timezone: useTimezone(),
     price: withPrice

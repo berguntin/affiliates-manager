@@ -39,7 +39,7 @@ server/
 │  ├─ publication.ts   máquina de estados de la cola
 │  ├─ schedule.ts      franjas horarias, límite diario, siguiente hueco libre
 │  ├─ affiliate.ts     construcción y validación de enlaces de afiliado
-│  └─ messages/        motor de plantillas, formatos Telegram/WhatsApp, avisos legales
+│  └─ messages/        motor de plantillas, formatos Telegram/WhatsApp, avisos legales, entradilla IA
 ├─ providers/      ProductProvider + implementaciones (manual, mock; creators-api en fase 2)
 │  └─ history/       PriceHistoryProvider (null; Keepa en el futuro)
 ├─ channels/       ChannelAdapter + telegram (automático) y whatsapp (asistido)
@@ -128,7 +128,7 @@ runs (registro de ejecuciones) · settings (clave/valor, sin secretos)
 | `channels` | `id`, `type` (`telegram`/`whatsapp`), `name`, `identifier` (`@canal` o `-100…` / URL del canal de WhatsApp), `tracking_id`, `active`, `created_at`, `updated_at` |
 | `theme_channels` | `theme_id`, `channel_id` (PK compuesta) |
 | `manual_products` | `id`, `theme_id`, `asin`, `title`, `brand`, `note` (texto propio), `internal_price_cents` (**nota interna, nunca se publica**), `created_at` |
-| `deals` | `id`, `theme_id`, `asin`, `source`, `detected_at`, `expires_at` (= detectada + 24 h, o el fin de la oferta flash si es antes), datos de la instantánea (`title`, `brand`, `image_url`, `price_cents`, `saving_basis_cents`, `saving_basis_type`, `savings_pct`, `deal_type`, `deal_ends_at`), evaluación (`effective_discount_pct`, `reliability`, `suspicious`, `reasons` JSON, `score`), `purged_at` |
+| `deals` | `id`, `theme_id`, `asin`, `source`, `detected_at`, `expires_at` (= detectada + 24 h, o el fin de la oferta flash si es antes), datos de la instantánea (`title`, `brand`, `image_url`, `price_cents`, `saving_basis_cents`, `saving_basis_type`, `savings_pct`, `deal_type`, `deal_ends_at`), evaluación (`effective_discount_pct`, `reliability`, `suspicious`, `reasons` JSON, `score`), `intro` (entradilla con IA), `purged_at` |
 | `publications` | `id`, `deal_id`, `channel_id`, `status`, `text` (editable), `link`, `price_cents_shown`, `price_checked_at`, `needs_review`, `review_reason`, `scheduled_at`, `published_at`, `external_id`, `error`, `created_at`, `updated_at` |
 | `message_templates` | `id`, `theme_id` (null = global), `format` (`telegram-html`/`whatsapp`), `body`, `updated_at` — único por (`theme_id`, `format`) |
 | `runs` | `id`, `kind` (`scan`/`tick`), `trigger` (`cron`/`manual`), `theme_id`, `started_at`, `finished_at`, `status` (`running`/`ok`/`partial`/`error`), `stats` (JSON), `errors` (JSON) |
@@ -175,12 +175,13 @@ candidata/aprobada/programada ──(expires_at)──► caducada
   - Sin precio: `Consulta el precio actual en Amazon`.
   - Siempre: el aviso de afiliado literal.
 - El título se **trunca** (nunca se reescribe) a una longitud configurable. Se valida la longitud total frente a los límites de cada plataforma.
+- **Entradilla con IA** (`domain/messages/intro.ts` + `services/copywriter.ts`, SPEC §14.6): variable `{{entradilla}}`; si la plantilla no la incluye, va al principio. Se genera una por oferta al escanear (máx. 20 por ejecución, 4 en paralelo), se valida y se guarda en `deals.intro`. Los fallos de la API se agrupan en el registro de la ejecución y el mensaje sale solo con la plantilla.
 
 ## 7. Seguridad
 
 - **Cloudflare Access** delante de todo el dominio. El middleware de Nitro valida además `Cf-Access-Jwt-Assertion` con `jose` contra `https://<equipo>.cloudflareaccess.com/cdn-cgi/access/certs` (`aud` configurado) y comprueba el email autorizado. Si falla, responde 401.
 - En local: `NUXT_AUTH_DISABLED=true`, que solo se respeta en `import.meta.dev`.
-- **Secretos** (`wrangler secret put`): `TELEGRAM_BOT_TOKEN` y, en la fase 2, `CREATORS_API_CREDENTIAL_ID`/`_SECRET` y `ANTHROPIC_API_KEY`. El panel solo muestra si están configurados.
+- **Secretos** (`wrangler secret put`): `TELEGRAM_BOT_TOKEN`, `ANTHROPIC_API_KEY` (opcional) y, en la fase 2, `CREATORS_API_CREDENTIAL_ID`/`_SECRET`. El panel solo muestra si están configurados.
 - Las tareas del cron no exponen endpoints HTTP.
 
 ## 8. Errores y reintentos

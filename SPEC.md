@@ -90,7 +90,7 @@ Interfaz abstracta con al menos tres implementaciones:
 - **Plantillas por canal** (el formato cambia):
   - Telegram: HTML o MarkdownV2.
   - WhatsApp: formato propio (`*negrita*`, `_cursiva_`).
-- **Redacción con LLM (Anthropic API)** opcional, siguiendo el tono de la temática, con **fallback a plantilla** si la llamada falla. *(Fase 2.)*
+- **Redacción con LLM (Anthropic API)** opcional, siguiendo el tono de la temática, con **fallback a plantilla** si la llamada falla. El LLM solo redacta la entradilla (§14.6).
 - **Todo mensaje incluye obligatoriamente** ⚠️ (§13.A.1; ver `docs/creators-api.md` §7.5):
   - Precio y **fecha y hora de consulta**.
   - Advertencia de que **el precio puede cambiar**. Según la Licencia, el texto exigido es: *"Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra."* (puede ir enlazado).
@@ -162,7 +162,7 @@ Interfaz abstracta con al menos tres implementaciones:
 ### Fase 2
 
 - Integración real con la Creators API (`CreatorsApiProvider`), empezando por un *spike* con credenciales reales (ver [`docs/creators-api.md`](docs/creators-api.md) §8).
-- Redacción con LLM (Anthropic API) con fallback a plantilla.
+- ✅ Redacción con LLM (Anthropic API) con fallback a plantilla (§14.6).
 - Estadísticas.
 
 ### Fuera de alcance por ahora
@@ -219,3 +219,4 @@ Revisado con la documentación oficial de la Creators API y las **Políticas y e
 3. **Sin almacenamiento de imágenes** (resuelve 13.A.3). Los mensajes llevan el enlace de Amazon y la vista previa la genera cada plataforma. En Telegram se usa `sendMessage` con `link_preview_options` y un botón al producto. En WhatsApp se comparte solo texto. No se usa R2.
 4. **Nuxt 4 en lugar de Nuxt 3.** Nuxt 4 es la versión mayor actual: misma API y mismo Nitro, con la estructura `app/`. Nuxt 3 solo recibe mantenimiento. Para un proyecto nuevo, Nuxt 4 da más vida útil sin coste de aprendizaje.
 5. **Autenticación con Cloudflare Access.** El Worker valida además el JWT de Access (`Cf-Access-Jwt-Assertion`) y el email autorizado. En local, la validación se desactiva de forma explícita.
+6. **Redacción con IA: solo la entradilla** (resuelve 13.A.7). Con `ANTHROPIC_API_KEY`, el escaneo pide a `claude-opus-5-5` (esfuerzo `low`) **una frase de enganche por oferta** en el tono de la temática. El título, la marca, el precio, el enlace y los avisos siguen saliendo de la plantilla y del renderizador. La frase se valida antes de usarla: una línea, ≤ 180 caracteres, sin cifras, enlaces, formato, afirmaciones de precio o envío, ni tramos del título. Si no hay clave, la llamada falla o la frase no pasa la validación, el mensaje sale **solo con la plantilla**. Máximo 20 llamadas por ejecución. La entradilla se guarda en `deals.intro` para regenerar el mensaje tras una revisión de precio.

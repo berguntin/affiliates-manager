@@ -72,6 +72,7 @@ const channelType = computed(() => (props.format === 'telegram-html' ? 'telegram
     <p class="text-xs text-muted">
       Variables: <code v-for="tag in variableTags" :key="tag" class="mr-1" v-text="tag" />. Secciones:
       <code v-text="sectionExample" />. El precio con fecha y hora y los avisos legales se añaden siempre.
+      <code v-text="'{{entradilla}}'" /> es la frase redactada por IA; si la plantilla no la incluye, va al principio.
       <template v-if="format === 'telegram-html'">Formato HTML de Telegram: &lt;b&gt;, &lt;i&gt;.</template>
       <template v-else>Formato de WhatsApp: *negrita*, _cursiva_.</template>
     </p>

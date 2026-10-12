@@ -11,7 +11,15 @@ const rows = computed(() => [
     ok: status.value?.telegramConfigured,
   },
   { label: 'Creators API', value: 'Fase 2 (requiere 10 ventas en 30 días)', ok: false },
-  { label: 'Redacción con IA (Anthropic)', value: 'Fase 2', ok: false },
+  {
+    label: 'Redacción con IA (ANTHROPIC_API_KEY)',
+    value: !status.value
+      ? unknown
+      : status.value.anthropicConfigured
+        ? 'Configurada (entradilla con IA)'
+        : 'Sin configurar (solo plantilla)',
+    ok: status.value?.anthropicConfigured,
+  },
 ])
 </script>
 

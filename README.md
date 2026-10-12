@@ -8,7 +8,7 @@ Sistema que detecta ofertas de **Amazon.es** por temáticas configurables, prepa
 
 > **Estado: fase 1 (MVP).**
 > - Las fuentes de productos son el **alta manual** (se publica **sin precio**, SPEC §14.1) y un **proveedor simulado** para desarrollo.
-> - La integración con la Creators API y la redacción con IA llegan en la fase 2.
+> - Fase 2: la **redacción con IA** (entradilla con la Anthropic API, opcional) ya está; la integración con la Creators API, pendiente.
 
 ## Stack
 
@@ -76,6 +76,7 @@ Las ejecuciones aparecen en **Más → Ejecuciones**, que también permite lanza
 | `AUTH_AUDIENCE` | secreto | *Application Audience (AUD) Tag* de la aplicación de Access |
 | `AUTH_ALLOWED_EMAILS` | secreto | Emails autorizados, separados por comas |
 | `TELEGRAM_BOT_TOKEN` | secreto | Token del bot de Telegram |
+| `ANTHROPIC_API_KEY` | secreto | Opcional. Activa la entradilla redactada por IA (SPEC §14.6); sin ella, solo plantilla |
 | `AUTH_DISABLED` | solo local | `true` desactiva la autenticación. **Solo se respeta en `nuxt dev`** |
 
 En local van en `.dev.vars` (ignorado por git). En producción se configuran con `wrangler secret put NOMBRE`. **Nunca se guardan secretos en el repositorio.**
@@ -105,6 +106,7 @@ En local van en `.dev.vars` (ignorado por git). En producción se configuran con
    pnpm exec wrangler secret put AUTH_AUDIENCE
    pnpm exec wrangler secret put AUTH_ALLOWED_EMAILS
    pnpm exec wrangler secret put TELEGRAM_BOT_TOKEN
+   pnpm exec wrangler secret put ANTHROPIC_API_KEY   # opcional
    ```
    No hace falta volver a desplegar: los secretos se aplican al momento. Los Cron Triggers se registran a partir de `triggers.crons` en `wrangler.jsonc`.
 5. **Comprobación**: abre la URL en una ventana privada. Debe pedirte el login de Access y, después, cargar el panel; en el panel, **Ajustes** debe mostrar «Cloudflare Access». Sin sesión, `curl https://…workers.dev/api/me` debe devolver la redirección al login de Access, no datos.
