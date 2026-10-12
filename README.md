@@ -91,22 +91,23 @@ En local van en `.dev.vars` (ignorado por git). En producción se configuran con
    ```bash
    pnpm db:migrate:remote
    ```
-2. **Cloudflare Access.** En Zero Trust → Access → Applications → *Add an application* → *Self-hosted*:
-   - Dominio: el del Worker (`affiliates-manager.<tu-subdominio>.workers.dev`) o tu dominio propio.
-   - Política: *Allow* solo a tu email.
-   - Copia el *AUD tag* y el dominio del equipo.
-3. **Secretos**
+2. **Despliegue inicial** (sin secretos de Access, la API responde 500 «Autenticación no configurada»):
+   ```bash
+   pnpm run deploy
+   ```
+3. **Cloudflare Access.** Dashboard → Workers & Pages → `affiliates-manager` → Settings → Domains & Routes → en `workers.dev`, **Enable Cloudflare Access**.
+   - El aviso que aparece muestra el **AUD** (`POLICY_AUD`) y el **dominio del equipo** (`TEAM_DOMAIN`): guárdalos.
+   - En **Manage Cloudflare Access**, deja la política de la aplicación solo con tu email.
+   - Las Preview URLs están desactivadas (`preview_urls: false`) porque no quedarían protegidas.
+4. **Secretos**
    ```bash
    pnpm exec wrangler secret put AUTH_TEAM_DOMAIN
    pnpm exec wrangler secret put AUTH_AUDIENCE
    pnpm exec wrangler secret put AUTH_ALLOWED_EMAILS
    pnpm exec wrangler secret put TELEGRAM_BOT_TOKEN
    ```
-4. **Despliegue**
-   ```bash
-   pnpm run deploy
-   ```
-   Los Cron Triggers se registran a partir de `triggers.crons` en `wrangler.jsonc`.
+   No hace falta volver a desplegar: los secretos se aplican al momento. Los Cron Triggers se registran a partir de `triggers.crons` en `wrangler.jsonc`.
+5. **Comprobación**: abre la URL en una ventana privada. Debe pedirte el login de Access y, después, cargar el panel; en el panel, **Ajustes** debe mostrar «Cloudflare Access». Sin sesión, `curl https://…workers.dev/api/me` debe devolver la redirección al login de Access, no datos.
 
 ### Telegram
 

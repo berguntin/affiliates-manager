@@ -8,9 +8,17 @@ export interface AccessConfig {
   allowedEmails: string[]
 }
 
+/** Acepta `equipo.cloudflareaccess.com` o `https://equipo.cloudflareaccess.com/`. */
+export function normalizeTeamDomain(value: string): string {
+  return value
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/+$/, '')
+}
+
 /** Valida el JWT que Cloudflare Access añade a cada petición y devuelve el email. */
 export async function verifyAccessToken(token: string, config: AccessConfig): Promise<string> {
-  const issuer = `https://${config.teamDomain}`
+  const issuer = `https://${normalizeTeamDomain(config.teamDomain)}`
   let jwks = jwksByTeam.get(issuer)
   if (!jwks) {
     jwks = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`))
