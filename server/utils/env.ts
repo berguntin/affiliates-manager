@@ -17,7 +17,7 @@ export interface AppEnv {
 export function useEnv(): AppEnv {
   const env = (globalThis as { __env__?: Partial<AppEnv> }).__env__
   if (!env?.DB) {
-    throw createError({ statusCode: 500, statusMessage: 'Binding D1 "DB" no disponible' })
+    throw createError({ statusCode: 500, message: 'Binding D1 "DB" no disponible' })
   }
   return env as AppEnv
 }

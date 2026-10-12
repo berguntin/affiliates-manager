@@ -367,7 +367,10 @@ export async function tick(db: Db, log: RunLog, ctx: QueueContext) {
       const result = await publish(db, id, ctx)
       log.count(result.published ? 'publicadas' : 'a_revision')
     } catch (error) {
-      log.error(`Publicación ${id.slice(0, 8)}: ${(error as Error).message}`)
+      // Se devuelve a «aprobada» para no reintentar cada 10 minutos; el error queda visible.
+      const message = (error as Error).message
+      await setStatus(db, id, 'aprobada', { scheduledAt: null, error: message })
+      log.error(`Publicación ${id.slice(0, 8)}: ${message}`)
     }
   }
 

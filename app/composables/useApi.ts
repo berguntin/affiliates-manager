@@ -11,7 +11,7 @@ export function apiErrorMessage(error: unknown): string {
   const data = (error as FetchError<ApiErrorData>)?.data
   const issues = data?.data?.issues
   if (issues?.length) return issues.map((i) => (i.path ? `${i.path}: ${i.message}` : i.message)).join(' · ')
-  return data?.statusMessage || data?.message || (error as Error)?.message || 'Error desconocido'
+  return data?.message || data?.statusMessage || (error as Error)?.message || 'Error desconocido'
 }
 
 /** Ejecuta una acción contra la API mostrando un aviso de éxito o error. */

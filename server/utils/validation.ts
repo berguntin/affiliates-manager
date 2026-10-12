@@ -11,13 +11,13 @@ export async function readValidated<S extends z.ZodType>(
     const body = await readRawBody(event)
     raw = body ? JSON.parse(body) : {}
   } catch {
-    throw createError({ statusCode: 400, statusMessage: 'JSON no válido' })
+    throw createError({ statusCode: 400, message: 'JSON no válido' })
   }
   const result = schema.safeParse(raw)
   if (!result.success) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Datos no válidos',
+      message: 'Datos no válidos',
       data: {
         issues: result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
       },
@@ -28,10 +28,10 @@ export async function readValidated<S extends z.ZodType>(
 
 export function requireParam(event: H3Event, name: string): string {
   const value = getRouterParam(event, name)
-  if (!value) throw createError({ statusCode: 400, statusMessage: `Falta el parámetro ${name}` })
+  if (!value) throw createError({ statusCode: 400, message: `Falta el parámetro ${name}` })
   return value
 }
 
 export function notFound(what: string): never {
-  throw createError({ statusCode: 404, statusMessage: `${what} no encontrado` })
+  throw createError({ statusCode: 404, message: `${what} no encontrado` })
 }

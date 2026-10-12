@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const { themeId, body } = await readValidated(event, bodySchema)
   if (body !== null) {
     const errors = validateTemplate(body, TEMPLATE_VARIABLES)
-    if (errors.length) throw createError({ statusCode: 400, statusMessage: errors.join(' · ') })
+    if (errors.length) throw createError({ statusCode: 400, message: errors.join(' · ') })
   }
   await saveTemplate(useDb(), themeId, format, body)
   return { ok: true }

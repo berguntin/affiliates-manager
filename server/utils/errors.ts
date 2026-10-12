@@ -8,13 +8,13 @@ export async function handleDomainErrors<T>(fn: () => Promise<T>): Promise<T> {
     return await fn()
   } catch (error) {
     if (error instanceof QueueError) {
-      throw createError({ statusCode: error.statusCode, statusMessage: error.message })
+      throw createError({ statusCode: error.statusCode, message: error.message })
     }
     if (error instanceof TransitionError) {
-      throw createError({ statusCode: 409, statusMessage: error.message })
+      throw createError({ statusCode: 409, message: error.message })
     }
     if (error instanceof ProviderUnavailableError) {
-      throw createError({ statusCode: 503, statusMessage: error.message })
+      throw createError({ statusCode: 503, message: error.message })
     }
     throw error
   }

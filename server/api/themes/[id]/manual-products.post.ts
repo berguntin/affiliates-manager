@@ -12,11 +12,11 @@ export default defineEventHandler(async (event) => {
   const input = await readValidated(event, manualProductInputSchema.omit({ themeId: true }))
   const theme = (await getTheme(db, themeId)) ?? notFound('Temática')
   if (theme.provider !== 'manual') {
-    throw createError({ statusCode: 400, statusMessage: 'La temática no usa la fuente «Alta manual»' })
+    throw createError({ statusCode: 400, message: 'La temática no usa la fuente «Alta manual»' })
   }
   const asin = parseAsin(input.asinOrUrl)
   if (!asin) {
-    throw createError({ statusCode: 400, statusMessage: 'No se reconoce el ASIN ni una URL de amazon.es' })
+    throw createError({ statusCode: 400, message: 'No se reconoce el ASIN ni una URL de amazon.es' })
   }
   await addManualProduct(db, {
     themeId,
