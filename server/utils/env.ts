@@ -8,6 +8,14 @@ export interface AppEnv {
   AUTH_AUDIENCE?: string
   AUTH_ALLOWED_EMAILS?: string
   TELEGRAM_BOT_TOKEN?: string
+  /** Bot buzón (SPEC §14.8): bot aparte que recibe enlaces. */
+  INTAKE_BOT_TOKEN?: string
+  /** Token secreto del webhook (cabecera X-Telegram-Bot-Api-Secret-Token). */
+  INTAKE_WEBHOOK_SECRET?: string
+  /** IDs numéricos de Telegram autorizados, separados por comas. */
+  INTAKE_ALLOWED_USER_IDS?: string
+  /** Solo para pruebas locales: base alternativa de la Bot API. */
+  TELEGRAM_API_BASE?: string
   ANTHROPIC_API_KEY?: string
 }
 

@@ -203,3 +203,26 @@ export const settings = sqliteTable('settings', {
   value: text('value', { mode: 'json' }).notNull(),
   updatedAt: timestamp('updated_at').notNull().default(now),
 })
+
+/** Borradores del bot buzón (SPEC §14.8): lo compartido antes de elegir temática. */
+export const intakeDrafts = sqliteTable(
+  'intake_drafts',
+  {
+    /** Id corto: viaja en los botones de Telegram (callback_data ≤ 64 bytes). */
+    id: text('id').primaryKey(),
+    chatId: text('chat_id').notNull(),
+    userId: text('user_id').notNull(),
+    /** Mensaje del bot con la tarjeta; las respuestas a él editan el borrador. */
+    cardMessageId: integer('card_message_id'),
+    asin: text('asin').notNull(),
+    title: text('title'),
+    note: text('note').notNull().default(''),
+    priceCents: integer('price_cents'),
+    themeId: text('theme_id').references(() => themes.id, { onDelete: 'set null' }),
+    publicationIds: jsonList('publication_ids'),
+    queuedAt: timestamp('queued_at'),
+    cancelledAt: timestamp('cancelled_at'),
+    createdAt: timestamp('created_at').notNull().default(now),
+  },
+  (t) => [index('intake_drafts_card_idx').on(t.chatId, t.cardMessageId)],
+)
