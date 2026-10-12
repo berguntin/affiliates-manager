@@ -58,6 +58,8 @@ const rows = computed(() => [
       </p>
     </UCard>
 
+    <IntakeBotCard />
+
     <UCard>
       <template #header>
         <h2 class="font-medium">Plantilla general de Telegram</h2>

@@ -117,6 +117,36 @@ En local van en `.dev.vars` (ignorado por git). En producción se configuran con
 2. Añade el bot como **administrador** del canal, con permiso para publicar.
 3. En el panel, crea el canal con `@nombre_del_canal` (o el id `-100…`) y pulsa **Verificar bot**.
 
+### Bot buzón (enviar ofertas desde el móvil)
+
+Un **bot aparte** del que publica. Compartís un producto desde la app de Amazon (**Compartir → Telegram → el bot**) y:
+
+1. El bot saca el ASIN del enlace. Los enlaces cortos `amzn.eu` se resuelven siguiendo solo la redirección; nunca se abre la página del producto.
+2. Responde con una tarjeta. **Respondiendo a ella** podéis añadir:
+   - el precio (`19,99`), que se publica con la fecha y hora del alta (SPEC §14.7, riesgo aceptado);
+   - el título (`t: …`), si no venía en el texto compartido;
+   - un comentario (cualquier otro texto).
+3. Elegís la temática (solo las de fuente «Alta manual»). Se crea la candidata en cada canal con la entradilla de IA.
+4. Desde la misma tarjeta:
+   - Telegram: 🚀 publicar, ⏰ próximo ciclo o 🗑️ descartar.
+   - WhatsApp: 📋 recibir el texto, ✅ marcar como hecho o 🗑️ descartar.
+
+Configuración:
+1. Crea el bot con [@BotFather](https://t.me/BotFather) (`/newbot`) y, en `/setjoingroups`, desactiva que lo añadan a grupos.
+2. Secretos:
+   ```bash
+   pnpm exec wrangler secret put INTAKE_BOT_TOKEN          # token del bot buzón
+   pnpm exec wrangler secret put INTAKE_WEBHOOK_SECRET     # cadena aleatoria, p. ej. `openssl rand -hex 32`
+   pnpm exec wrangler secret put INTAKE_ALLOWED_USER_IDS   # vuestros IDs de Telegram: 111111111,222222222
+   ```
+   Para saber vuestro ID, escribid al bot: si no estáis autorizados, os lo dice.
+3. **Cloudflare Access debe dejar pasar al webhook**, porque Telegram no puede iniciar sesión.
+   - En Zero Trust → Access → Applications, crea una aplicación *Self-hosted* con el mismo dominio y la ruta `webhooks/telegram-intake`.
+   - Ponle una política con acción **Bypass** e *Include: Everyone*.
+   - La ruta sigue protegida por el token secreto que Telegram envía en cada petición.
+4. En el panel, **Ajustes → Bot buzón → Conectar webhook**.
+5. Para que tu pareja use también el panel, añade su email a la política de Access y a `AUTH_ALLOWED_EMAILS`.
+
 ### WhatsApp (publicación asistida)
 
 La API oficial no permite publicar en Canales de WhatsApp, y las librerías no oficiales arriesgan el baneo del número, así que no se usan. En la cola, **Compartir en WhatsApp**:

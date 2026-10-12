@@ -192,3 +192,14 @@ candidata/aprobada/programada ──(expires_at)──► caducada
 ## 9. Tests
 
 Vitest sobre `server/domain/**`: evaluación de ofertas, deduplicación, plantillas y escapado, transiciones de estado, franjas y huecos, y enlaces de afiliado. También sobre el *mapper* de Creators API usando las fixtures del mock.
+
+## 10. Bot buzón (SPEC §14.8)
+
+- `server/routes/webhooks/telegram-intake.post.ts`: webhook fuera de `/api`, protegido con `X-Telegram-Bot-Api-Secret-Token`. Responde enseguida y procesa con `waitUntil`.
+- `server/domain/intake.ts`: lógica pura (URLs, ASIN, título, precio, respuestas, tarjetas y botones), con tests.
+- `server/services/intake.ts`:
+  - borradores en `intake_drafts`;
+  - al elegir temática, alta manual y `scanTheme` (con entradilla de IA);
+  - los botones usan las acciones de la cola (`publish`, `applyAction`).
+- Los enlaces cortos se resuelven con `redirect: 'manual'` y `User-Agent: Agent/OfertasBuzon…`. Nunca se piden páginas de amazon.es.
+
