@@ -1,4 +1,4 @@
-import { deleteChannel } from '../../services/channels'
+import { deleteChannel } from '../../../services/channels'
 
 export default defineEventHandler(async (event) => {
   if (!(await deleteChannel(useDb(), requireParam(event, 'id')))) notFound('Canal')

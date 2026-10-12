@@ -1,4 +1,4 @@
-import { deleteTheme } from '../../services/themes'
+import { deleteTheme } from '../../../services/themes'
 
 export default defineEventHandler(async (event) => {
   if (!(await deleteTheme(useDb(), requireParam(event, 'id')))) notFound('Temática')
