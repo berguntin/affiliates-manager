@@ -28,6 +28,7 @@ const preview = ref<{ text: string; warnings: string[] } | null>(null)
 const { run, pending } = useApiAction()
 
 async function updatePreview() {
+  if (!data.value) return // sin plantilla cargada no hay nada que previsualizar
   preview.value =
     (await run(() =>
       apiFetch<{ text: string; warnings: string[] }>('/api/templates/preview', {

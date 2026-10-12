@@ -1,6 +1,13 @@
 <script setup lang="ts">
 const route = useRoute()
 
+// Comprobación de salud de la API (Access, secretos, red) en cada navegación.
+const { error: healthError, refresh: checkHealth } = await useFetch('/api/me', { server: false })
+watch(() => route.path, () => checkHealth())
+const apiProblem = computed(() =>
+  healthError.value ? describeApiProblem(healthError.value.statusCode, healthError.value.data) : null,
+)
+
 const items = [
   { label: 'Resumen', icon: 'i-lucide-layout-dashboard', to: '/' },
   { label: 'Cola', icon: 'i-lucide-list-checks', to: '/cola' },
@@ -44,7 +51,16 @@ function isActive(to: string) {
       </div>
     </header>
 
-    <main class="mx-auto max-w-4xl px-4 py-4">
+    <main class="mx-auto max-w-4xl space-y-4 px-4 py-4">
+      <UAlert
+        v-if="apiProblem"
+        color="error"
+        variant="subtle"
+        icon="i-lucide-shield-alert"
+        :title="apiProblem.title"
+        :description="apiProblem.description"
+        :actions="[{ label: 'Recargar', color: 'error', variant: 'solid', onClick: () => reloadNuxtApp() }]"
+      />
       <slot />
     </main>
 

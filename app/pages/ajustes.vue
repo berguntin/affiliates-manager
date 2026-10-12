@@ -1,12 +1,13 @@
 <script setup lang="ts">
-const { data: status } = await useFetch('/api/settings/status')
+const { data: status, error } = await useFetch('/api/settings/status')
 
+const unknown = 'No disponible (la API no responde)'
 const rows = computed(() => [
-  { label: 'Autenticación', value: status.value?.authMode ?? '—', ok: true },
-  { label: 'Zona horaria', value: status.value?.timezone ?? '—', ok: true },
+  { label: 'Autenticación', value: status.value?.authMode ?? unknown, ok: Boolean(status.value) },
+  { label: 'Zona horaria', value: status.value?.timezone ?? unknown, ok: Boolean(status.value) },
   {
     label: 'Bot de Telegram (TELEGRAM_BOT_TOKEN)',
-    value: status.value?.telegramConfigured ? 'Configurado' : 'Sin configurar',
+    value: !status.value ? unknown : status.value.telegramConfigured ? 'Configurado' : 'Sin configurar',
     ok: status.value?.telegramConfigured,
   },
   { label: 'Creators API', value: 'Fase 2 (requiere 10 ventas en 30 días)', ok: false },
@@ -22,6 +23,14 @@ const rows = computed(() => [
       <template #header>
         <h2 class="font-medium">Configuración y claves</h2>
       </template>
+      <UAlert
+        v-if="error"
+        class="mb-3"
+        color="error"
+        variant="subtle"
+        :title="`No se pudo leer la configuración (${error.statusCode ?? 'sin respuesta'})`"
+        :description="apiErrorMessage(error)"
+      />
       <ul class="divide-y divide-default text-sm">
         <li v-for="row in rows" :key="row.label" class="flex items-center justify-between gap-3 py-2">
           <span>{{ row.label }}</span>
