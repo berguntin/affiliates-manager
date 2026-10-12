@@ -1,0 +1,13 @@
+# Copia este fichero a .dev.vars para desarrollo local (wrangler lo lee automáticamente).
+# En producción usa `wrangler secret put <NOMBRE>` para los secretos.
+
+# Desactiva la validación de Cloudflare Access (solo se respeta en `nuxt dev`).
+AUTH_DISABLED=true
+
+# Cloudflare Access (producción)
+# AUTH_TEAM_DOMAIN=mi-equipo.cloudflareaccess.com
+# AUTH_AUDIENCE=<Application Audience (AUD) Tag>
+# AUTH_ALLOWED_EMAILS=yo@example.com
+
+# Telegram (secreto)
+# TELEGRAM_BOT_TOKEN=123456:ABC...

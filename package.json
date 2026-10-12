@@ -1,0 +1,42 @@
+{
+  "name": "affiliates-manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "npm run build && wrangler dev",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply affiliates-manager --local",
+    "db:migrate:remote": "wrangler d1 migrations apply affiliates-manager --remote",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "@nuxt/ui": "4.11.3",
+    "drizzle-orm": "0.45.4",
+    "jose": "6.2.12",
+    "nuxt": "4.6.1",
+    "tailwindcss": "4.3.3",
+    "zod": "4.6.6"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261012.1",
+    "@iconify-json/lucide": "^1.2.143",
+    "drizzle-kit": "0.31.11",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "vue-tsc": "3.3.13",
+    "wrangler": "4.149.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd"
+    ]
+  }
+}

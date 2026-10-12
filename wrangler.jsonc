@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "affiliates-manager",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".output/public",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "affiliates-manager",
+      // Sustituir por el id que devuelve `wrangler d1 create affiliates-manager`
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "server/db/migrations"
+    }
+  ],
+  // Deben coincidir con `nitro.scheduledTasks` en nuxt.config.ts (UTC)
+  "triggers": {
+    "crons": ["0 5 * * *", "*/10 * * * *"]
+  },
+  "vars": {
+    "TIMEZONE": "Europe/Madrid"
+  }
+}

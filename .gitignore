@@ -1,0 +1,15 @@
+node_modules
+.nuxt
+.output
+.data
+.wrangler
+dist
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.log
+.DS_Store
+coverage
