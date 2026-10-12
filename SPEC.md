@@ -1,7 +1,7 @@
 # SPEC — Plataforma de canales de ofertas de Amazon (afiliados)
 
 > Documento de referencia del proyecto. Es la base sobre la que se trabaja: cualquier cambio de alcance se refleja aquí primero.
-> Estado: **borrador pendiente de aprobación**. No se implementa nada hasta aprobar la arquitectura, el modelo de datos y el plan por fases (§12).
+> Estado: **aprobado para la fase 1** (2026-10-12). Decisiones en §14; arquitectura y modelo de datos en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 ---
 
@@ -32,7 +32,7 @@ Usuario único: el propietario (frontend engineer: Vue, Nuxt, TypeScript; ya usa
 
 | Pieza | Elección | Notas |
 |---|---|---|
-| Framework | **Nuxt 3** + Nitro | Preset de Cloudflare (Workers). |
+| Framework | **Nuxt 4** + Nitro (ver §14.4) | Preset `cloudflare_module` (Workers). |
 | Base de datos | **Cloudflare D1** | Migraciones versionadas en el repo. |
 | Tareas programadas | **Cron Triggers** | Escaneo diario (y ver §13 para publicaciones programadas). |
 | Ficheros | **R2** | ⚠️ No para imágenes de producto (prohibido almacenarlas, §13.A.3). |
@@ -154,7 +154,7 @@ Interfaz abstracta con al menos tres implementaciones:
 
 1. Modelo de datos, migraciones y autenticación del panel.
 2. CRUD de temáticas y canales.
-3. `ManualProvider` y `MockProvider`, histórico de precios y detección de ofertas.
+3. `ManualProvider` y `MockProvider`, instantáneas de precio con caducidad de 24 h y detección de ofertas con los datos de Amazon (§14.2).
 4. Generación de mensajes con plantillas.
 5. Cola de publicaciones con Telegram automático y WhatsApp asistido.
 6. Cron diario funcionando contra `MockProvider`.
@@ -209,3 +209,13 @@ Revisado con la documentación oficial de la Creators API y las **Políticas y e
 7. **Límite de texto en Telegram.** El caption de `sendPhoto` admite 1024 caracteres y `sendMessage` 4096. Con la propuesta 13.A.3 (texto + vista previa) se usa `sendMessage`. Las plantillas validan la longitud igualmente.
 8. **WhatsApp y Web Share API** *(verificar)*. No está garantizado que la hoja de compartir permita elegir un **Canal** de WhatsApp como destino. Con la propuesta 13.A.3 basta con compartir texto: `navigator.share({ text })` o copiar al portapapeles.
 9. **Autenticación del panel.** Recomendado **Cloudflare Access** (gratis para un usuario, sin contraseñas, cómodo en móvil). Se valida también el JWT de Access en el Worker y se protegen por separado los endpoints internos de cron.
+
+---
+
+## 14. Decisiones tomadas
+
+1. **Publicar sin API en la fase 1** (resuelve 13.A.1). Los productos dados de alta con `ManualProvider` se publican **sin precio**, con el texto "Consulta el precio actual en Amazon". El precio que se introduzca a mano es solo una nota interna y nunca aparece en un mensaje. Los mensajes con precio (procedentes de la API, o del mock en desarrollo) incluyen la fecha y hora de consulta y el descargo de la Licencia.
+2. **Detección de ofertas con los datos de Amazon** (resuelve 13.A.2). Se usan `savingBasisType` y `savings` de OffersV2, junto con las señales de §13.A.2. **No se mantiene un histórico propio de precios**: las instantáneas caducan a las 24 h y se purgan. Keepa queda como fuente opcional detrás de la interfaz `PriceHistoryProvider` (sin implementar). **No se pedirá autorización escrita a Afiliados**: el proyecto es un MVP para validar la idea.
+3. **Sin almacenamiento de imágenes** (resuelve 13.A.3). Los mensajes llevan el enlace de Amazon y la vista previa la genera cada plataforma. En Telegram se usa `sendMessage` con `link_preview_options` y un botón al producto. En WhatsApp se comparte solo texto. No se usa R2.
+4. **Nuxt 4 en lugar de Nuxt 3.** Nuxt 4 es la versión mayor actual: misma API y mismo Nitro, con la estructura `app/`. Nuxt 3 solo recibe mantenimiento. Para un proyecto nuevo, Nuxt 4 da más vida útil sin coste de aprendizaje.
+5. **Autenticación con Cloudflare Access.** El Worker valida además el JWT de Access (`Cf-Access-Jwt-Assertion`) y el email autorizado. En local, la validación se desactiva de forma explícita.
