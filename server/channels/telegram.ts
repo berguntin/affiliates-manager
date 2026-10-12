@@ -1,13 +1,6 @@
-import { HttpError, fetchJsonWithRetry, type RetryOptions } from '../utils/http'
+import type { RetryOptions } from '../utils/http'
+import { callTelegram } from './telegram-api'
 import { ChannelConfigError, type ChannelAdapter, type ChannelTarget, type OutgoingMessage } from './types'
-
-interface TelegramResponse<T> {
-  ok: boolean
-  result?: T
-  description?: string
-  error_code?: number
-  parameters?: { retry_after?: number }
-}
 
 /** Publicación automática con la Bot API oficial (el bot debe ser administrador del canal). */
 export class TelegramAdapter implements ChannelAdapter {
@@ -22,24 +15,7 @@ export class TelegramAdapter implements ChannelAdapter {
 
   private async call<T>(method: string, payload: Record<string, unknown>): Promise<T> {
     if (!this.token) throw new ChannelConfigError('Falta el secreto TELEGRAM_BOT_TOKEN')
-    try {
-      const res = await fetchJsonWithRetry<TelegramResponse<T>>(
-        `https://api.telegram.org/bot${this.token}/${method}`,
-        { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) },
-        {
-          ...this.retry,
-          retryAfter: (_r, body) => (body as TelegramResponse<T> | null)?.parameters?.retry_after ?? null,
-        },
-      )
-      if (!res.ok || res.result === undefined) throw new Error(res.description ?? 'Respuesta no válida')
-      return res.result
-    } catch (error) {
-      if (error instanceof HttpError) {
-        const description = (error.body as TelegramResponse<T> | null)?.description
-        throw new Error(`Telegram (${error.status}): ${description ?? 'error desconocido'}`)
-      }
-      throw error
-    }
+    return callTelegram<T>(this.token, method, payload, this.retry)
   }
 
   /** Texto con vista previa del enlace de Amazon (sin subir imágenes, SPEC §14.3) y botón. */
