@@ -10,6 +10,14 @@ export default defineEventHandler(async (event) => {
       message: 'Configura INTAKE_BOT_TOKEN, INTAKE_WEBHOOK_SECRET e INTAKE_ALLOWED_USER_IDS con «wrangler secret put»',
     })
   }
+  // Telegram solo admite A-Z, a-z, 0-9, «_» y «-» (1–256) en el token secreto del webhook.
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(env.INTAKE_WEBHOOK_SECRET!)) {
+    throw createError({
+      statusCode: 400,
+      message:
+        'INTAKE_WEBHOOK_SECRET solo puede tener letras, números, «_» y «-». Genera uno con «openssl rand -hex 32» y vuelve a ponerlo.',
+    })
+  }
   const url = `${getRequestURL(event).origin}/webhooks/telegram-intake`
   const token = env.INTAKE_BOT_TOKEN!
   const opts = intakeApiOptions(env)
