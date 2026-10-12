@@ -159,7 +159,7 @@ Interfaz abstracta con al menos tres implementaciones:
 
 ### Fase 2
 
-- Integración real con la Creators API (`CreatorsApiProvider`).
+- Integración real con la Creators API (`CreatorsApiProvider`), empezando por un *spike* con credenciales reales (ver [`docs/creators-api.md`](docs/creators-api.md) §8).
 - Redacción con LLM (Anthropic API) con fallback a plantilla.
 - Estadísticas.
 
@@ -183,6 +183,6 @@ Observaciones iniciales sobre los requisitos. Cada una debe resolverse (o acepta
 7. **Límite de caption en Telegram.** `sendPhoto` limita el texto a 1024 caracteres; el aviso legal + advertencia de precio ocupan una parte notable. Las plantillas deben validar longitud (y prever fallback a `sendMessage` con vista previa si se excede).
 8. **WhatsApp y Web Share API** *(verificar)*. Compartir con archivo funciona en Chrome Android y Safari iOS, pero no está garantizado que la hoja de compartir de WhatsApp permita elegir un **Canal** como destino (puede que solo chats). Si no, el flujo móvil sería "copiar texto + guardar imagen + pegar en el canal". Además, al compartir imagen + texto algunas apps descartan el texto.
 9. **Tracking ID por canal.** Los tracking IDs adicionales se crean en el panel de Afiliados (hay un límite por cuenta) y deben existir antes de usarse; el panel debería avisar si un canal no tiene tracking ID asignado.
-10. **Acceso a la Creators API** *(verificar)*. Está condicionado a ventas cualificadas y, posiblemente, a mantenerlas; la cuenta puede perder acceso si bajan. El sistema debe degradar con elegancia a `ManualProvider` sin romperse.
-11. **Precio tachado / ahorro.** Hay que confirmar qué campos de precio, ahorro, valoraciones y número de reseñas expone realmente la Creators API: los filtros de calidad (valoración mínima, nº de reseñas) dependen de que existan.
+10. **Acceso a la Creators API** *(confirmado en la doc oficial; ver [`docs/creators-api.md`](docs/creators-api.md))*. Requiere **10 ventas cualificadas en los últimos 30 días**, y la cuota (inicialmente 1 TPS / 8.640 TPD) depende de los ingresos generados vía API, así que puede bajar. Si se pierde la elegibilidad, la API responde `AssociateNotEligible`. El sistema debe degradar con elegancia a `ManualProvider` sin romperse.
+11. **Campos de precio, ahorro y reseñas** *(ver [`docs/creators-api.md`](docs/creators-api.md) §4–§5)*. La API expone `offersV2.listings.price.savings` y `savingBasis.savingBasisType` (`LIST_PRICE`, `WAS_PRICE`, `LOWEST_PRICE`…), lo que ayuda a detectar descuentos inflados. También expone `violatesMAP` (no mostrar el precio si es `true`) y `customerReviews.count`/`starRating`. No hay filtro de nº mínimo de reseñas ni de exclusiones en la API: se aplican en local. *Verificar con datos reales* que `customerReviews` llega relleno en amazon.es.
 12. **Autenticación.** Recomendado **Cloudflare Access** (gratis para un usuario, sin gestionar contraseñas, compatible con móvil). Validar el JWT de Access también en el Worker para no depender solo de la configuración del dominio, y proteger por separado los endpoints de cron/webhooks.
