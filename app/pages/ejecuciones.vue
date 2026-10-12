@@ -1,3 +1,38 @@
+<script setup lang="ts">
+const { data: runs, refresh, status } = await useFetch('/api/runs', { default: () => [] })
+const { run, pending } = useApiAction()
+
+async function trigger(kind: 'scan' | 'tick') {
+  const result = await run(
+    () => apiFetch(`/api/runs/${kind}`, { method: 'POST' }),
+    kind === 'scan' ? 'Escaneo completado' : 'Cola procesada',
+  )
+  if (result) await refresh()
+}
+</script>
+
 <template>
-  <UEmpty icon="i-lucide-construction" title="En construcción" />
+  <div class="space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <h1 class="text-xl font-semibold">Ejecuciones</h1>
+      <UButton
+        icon="i-lucide-refresh-cw"
+        variant="ghost"
+        color="neutral"
+        aria-label="Actualizar"
+        :loading="status === 'pending'"
+        @click="refresh()"
+      />
+    </div>
+    <p class="text-sm text-muted">
+      El cron escanea todas las temáticas activas cada día a las 05:00 UTC y procesa la cola cada 10 minutos
+      (publica lo programado, caduca y purga). Puedes lanzarlo a mano:
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <UButton label="Escanear todas" icon="i-lucide-scan-search" :loading="pending" @click="trigger('scan')" />
+      <UButton label="Procesar cola" icon="i-lucide-play" variant="soft" :loading="pending" @click="trigger('tick')" />
+    </div>
+    <UEmpty v-if="!runs.length" icon="i-lucide-activity" title="Aún no hay ejecuciones" />
+    <RunList v-else :runs="runs" />
+  </div>
 </template>

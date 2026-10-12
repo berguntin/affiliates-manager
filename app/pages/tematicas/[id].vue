@@ -105,6 +105,8 @@ async function remove() {
     </div>
 
 
+    <ThemeActions v-if="!isNew" :theme-id="id" :provider="state.provider" />
+
     <UForm :schema="themeInputSchema" :state="state" class="space-y-4" @submit="save">
       <UCard>
         <template #header><h2 class="font-medium">General</h2></template>
@@ -210,6 +212,22 @@ async function remove() {
             <UTextarea v-model="state.tone" :rows="2" placeholder="Cercano, para madres y padres primerizos" class="w-full" />
           </UFormField>
         </div>
+      </UCard>
+
+      <UCard v-if="!isNew">
+        <template #header>
+          <h2 class="font-medium">Plantillas de esta temática</h2>
+          <p class="text-xs text-muted">Si no las cambias, se usan las generales de Ajustes.</p>
+        </template>
+        <UTabs
+          :items="[
+            { label: 'Telegram', slot: 'telegram' },
+            { label: 'WhatsApp', slot: 'whatsapp' },
+          ]"
+        >
+          <template #telegram><TemplateEditor format="telegram-html" :theme-id="id" /></template>
+          <template #whatsapp><TemplateEditor format="whatsapp" :theme-id="id" /></template>
+        </UTabs>
       </UCard>
 
       <div class="flex flex-wrap justify-between gap-2">

@@ -45,6 +45,13 @@ const identifierHelp = computed(() =>
 
 const { run, pending } = useApiAction()
 
+async function verify() {
+  const result = await run(() => apiFetch<{ ok: boolean; detail: string }>(`/api/channels/${id.value}/verify`, { method: 'POST' }))
+  if (result) {
+    useToast().add({ title: result.ok ? 'Canal correcto' : 'Revisa el canal', description: result.detail, color: result.ok ? 'success' : 'warning' })
+  }
+}
+
 async function save() {
   const body = channelInputSchema.parse(state)
   const saved = await run(
@@ -122,6 +129,14 @@ async function remove() {
           color="error"
           variant="soft"
           @click="remove"
+        />
+        <UButton
+          v-if="!isNew && state.type === 'telegram'"
+          label="Verificar bot"
+          icon="i-lucide-shield-check"
+          variant="soft"
+          :loading="pending"
+          @click="verify"
         />
         <UButton type="submit" label="Guardar" icon="i-lucide-save" :loading="pending" class="ml-auto" />
       </div>
