@@ -1,136 +1,189 @@
-# Amazon Creators API — notas de investigación
+# Amazon Creators API y normas de Afiliados de amazon.es — notas de investigación
 
-> Fecha: 2026-10-12. Base para diseñar `CreatorsApiProvider` (fase 2).
+> Fecha: 2026-10-12. Base para diseñar los proveedores de producto y la generación de mensajes.
 > **Nada de aquí se ha probado contra la API real** (no hay credenciales: hacen falta ventas, ver §1).
 
-## 0. Fuentes y grado de confianza
+## 0. Fuentes
 
-| Fuente | Cómo se ha consultado | Confianza |
-|---|---|---|
-| Documentación oficial (`affiliate-program.amazon.com/creatorsapi/docs`, y sus espejos `.it`, `.com.au`, `.co.jp`) | **Solo a través de extractos de buscador.** La red de este entorno de desarrollo bloquea los dominios de Amazon, así que las páginas no se han podido abrir directamente. | Media-alta |
-| SDK de Node.js (paquete npm `creatorsapi-nodejs-sdk@1.2.0`, Apache-2.0, código generado) | Descargado e inspeccionado sin ejecutarlo. **No lo publica Amazon** (el SDK oficial se descarga desde Associates Central); parece una copia del SDK oficial. | Media: los nombres coinciden con la doc oficial, pero hay que contrastarlos con el SDK oficial |
-| Webs de terceros (plugins de WordPress, n8n, etc.) | Extractos de buscador. | Baja: solo como pista |
+Todo lo que sigue sale de **documentación oficial leída directamente**, salvo donde se indique lo contrario:
 
-**Acción pendiente:** cuando tengas acceso, contrastar §2–§5 con el SDK oficial y con la referencia de la API. Otra opción es abrir `affiliate-program.amazon.com` en la red del entorno y lo reviso yo.
+- Documentación de la Creators API: `https://affiliate-program.amazon.com/creatorsapi/docs/en-us/` (introducción, migración, *concepts*, referencia de operaciones y recursos, errores, *locale reference* de España).
+- **Políticas del Programa de Afiliados de amazon.es**, que incluyen la **Licencia** que rige el uso de la Creators API en España: `https://afiliados.amazon.es/help/operating/policies`. La propia doc de la API remite a ella como su *License Agreement*.
+- **Acuerdo Operativo de Afiliados de amazon.es**: `https://afiliados.amazon.es/help/operating/agreement`.
 
-## 1. Qué es y quién puede usarla
+Las referencias entre paréntesis del tipo *(Licencia 2.c.h)* son aproximadas, porque la página no numera de forma estable. Hay que buscarlas por texto.
 
-- La Creators API **sustituye a la PA-API 5.0**. Según el aviso oficial de deprecación, las llamadas a la PA-API 5 ya devuelven `403 AccessDeniedException`.
-- Es una API REST con autenticación OAuth 2.0 (*client credentials*). Según la guía de migración ofrece la misma funcionalidad que la PA-API 5.0.
-- **Requisitos (doc oficial):** estar dado de alta en Afiliados del marketplace y tener **al menos 10 ventas cualificadas en los últimos 30 días**. Solo puede registrarse el titular principal de la cuenta. Las credenciales se crean en Associates Central, menú *Herramientas*.
-- Si no se cumplen los requisitos, la API devuelve `AccessDeniedReason = AssociateNotEligible` (enum del SDK). **Se puede perder el acceso** si bajan las ventas, así que el sistema debe degradar a `ManualProvider`.
+Como fuente secundaria se usó una copia del SDK de Node.js publicada en npm (`creatorsapi-nodejs-sdk@1.2.0`). No es de Amazon y **la doc oficial la contradice en la autenticación** (ver §2): **no usarla**.
+
+---
+
+## 1. Acceso y elegibilidad
+
+- La Creators API sustituye a la PA-API 5.0. Las llamadas a la PA-API 5 devuelven `403 AccessDeniedException`.
+- **Requisitos:**
+  - Ser afiliado con **aceptación definitiva** en amazon.es.
+  - Tener **≥ 10 ventas cualificadas en los últimos 30 días**.
+  - Solo el **titular principal** de la cuenta puede registrarse (Associates Central → *Herramientas* → *Creators API*).
+  - Se pueden crear como máximo 2 aplicaciones por tienda, con 2 credenciales cada una. El *secret* solo se muestra una vez.
+- **Pérdida de acceso:** se pierde tras **30 días seguidos sin ventas cualificadas referidas**. Se recupera unos **2 días** después de que se envíen nuevas ventas. Mientras tanto, la API responde `403 AccessDeniedException` con `reason: AssociateNotEligible`.
+- **Consecuencia:** el sistema tiene que funcionar sin API en cualquier momento, no solo al principio.
 
 ## 2. Autenticación
 
-- Credenciales: **Credential ID**, **Credential Secret** y **Credential Version**.
-- La versión determina la región y el proveedor de identidad (SDK, `OAuth2Config`):
+- OAuth 2.0 *client credentials* con **Login with Amazon (LwA)**. Credenciales: *Credential ID*, *Credential Secret* y *Version*.
+- La versión se asigna según la región de la tienda. **amazon.es → versión 3.2**, con endpoint de token `https://api.amazon.co.uk/auth/o2/token`.
 
-| Versión | Región | Endpoint de token | Scope |
+```http
+POST https://api.amazon.co.uk/auth/o2/token
+Content-Type: application/json
+
+{ "grant_type": "client_credentials", "client_id": "…", "client_secret": "…", "scope": "creatorsapi::default" }
+```
+
+- Respuesta: `access_token`, `token_type: bearer`, `expires_in: 3600`.
+- **Cachear y reutilizar el token** hasta poco antes de que caduque, compartido entre procesos (en Workers: KV o D1). Pedir uno por petición provoca throttling.
+- Cabecera en cada llamada: `Authorization: Bearer <token>`. **Sin sufijo de versión**: la doc oficial dice *"No version header required"*.
+  - El SDK de npm usa endpoints de Cognito (2.x) y el sufijo `, Version x.y`. **Descartado.**
+
+## 3. Endpoints y cabeceras
+
+- Base: `https://creatorsapi.amazon`. Todas las operaciones son `POST` con JSON.
+- Cabeceras obligatorias: `Content-Type: application/json`, `Authorization: Bearer …`, `x-marketplace: www.amazon.es`.
+- Parámetros comunes: `partnerTag` (obligatorio) y `marketplace: "www.amazon.es"`.
+  - `partnerTag` admite el *store ID* **o cualquier tracking ID** de la cuenta en ese marketplace.
+
+| Operación | Ruta | Límite | Uso en este proyecto |
 |---|---|---|---|
-| `2.1` | NA (Cognito) | `https://creatorsapi.auth.us-east-1.amazoncognito.com/oauth2/token` | `creatorsapi/default` |
-| **`2.2`** | **EU (Cognito)** | `https://creatorsapi.auth.eu-south-2.amazoncognito.com/oauth2/token` | `creatorsapi/default` |
-| `2.3` | FE (Cognito) | `https://creatorsapi.auth.us-west-2.amazoncognito.com/oauth2/token` | `creatorsapi/default` |
-| `3.1` | NA (LWA) | `https://api.amazon.com/auth/o2/token` | `creatorsapi::default` |
-| **`3.2`** | **EU (LWA)** | `https://api.amazon.co.uk/auth/o2/token` | `creatorsapi::default` |
-| `3.3` | FE (LWA) | `https://api.amazon.co.jp/auth/o2/token` | `creatorsapi::default` |
+| SearchItems | `/catalog/v1/searchItems` | 10 resultados por página (`itemCount` 1–10) y `itemPage` 1–10, así que **máx. 100 resultados por consulta** | Escaneo diario por temática |
+| GetItems | `/catalog/v1/getItems` | **Hasta 10 ASIN = 1 transacción** | Refresco de precio antes de publicar |
+| GetBrowseNodes | `/catalog/v1/getBrowseNodes` | Hasta 10 nodos por llamada | Ayuda en el panel para elegir y validar nodos |
+| GetVariations | `/catalog/v1/getVariations` | — | No previsto |
 
-  Para amazon.es corresponde **2.2 o 3.2**, según el tipo de credencial que emita Associates Central.
-- Petición de token: `grant_type=client_credentials`, `client_id`, `client_secret`, `scope`. Con Cognito (2.x) se envía como `application/x-www-form-urlencoded`; con LWA (3.x), como JSON.
-- **El token dura 1 hora** (`expires_in: 3600`). La doc oficial pide **reutilizarlo** y no pedir uno por petición, porque eso provoca throttling. En Workers, cachearlo en KV o D1 con margen (el SDK renueva 30 s antes).
-- Cabecera de autorización:
-  - v2.x: `Authorization: Bearer <token>, Version <version>`
-  - v3.x: `Authorization: Bearer <token>`
+- **Locale de España:** idioma `es_ES` y moneda `EUR`. *Search indexes* relevantes: `Baby` (Bebé), `HomeAndKitchen`, `VideoGames`, `ToysAndGames`, `Electronics`, etc. (lista completa en la doc *locale-reference/spain*).
 
-## 3. Endpoints
+## 4. SearchItems: parámetros útiles
 
-Base: `https://creatorsapi.amazon`. Todas las operaciones son `POST` con cuerpo JSON y la cabecera **`x-marketplace: www.amazon.es`**.
+Hace falta al menos uno de estos: `keywords`, `brand`, `title`, `actor`, `artist` o `author`. Además se puede usar:
 
-| Operación | Ruta | Uso en este proyecto |
-|---|---|---|
-| SearchItems | `/catalog/v1/searchItems` | Escaneo diario por temática. |
-| GetItems | `/catalog/v1/getItems` | Recomprobar precios antes de publicar e instantáneas de histórico. **Hasta 10 ASIN por llamada y cuenta como 1 transacción.** |
-| GetVariations | `/catalog/v1/getVariations` | No previsto. |
-| GetBrowseNodes | `/catalog/v1/getBrowseNodes` | Ayuda en el panel para elegir y validar nodos de categoría. |
-| listFeeds / getFeed | `/catalog/v1/listFeeds`, `/catalog/v1/getFeed` | No previsto (no está claro el contenido). |
-| listReports / getReport | `/reports/v1/listReports`, `/reports/v1/getReport` | Posible fuente de estadísticas en la fase 2. **Según terceros, requiere un volumen de ventas muy alto**, así que no hay que contar con ello. |
-
-Los parámetros pasan de PascalCase (PA-API) a **lowerCamelCase**.
-
-> La ruta de SearchItems sigue el mismo patrón que las demás (`/catalog/v1/<operación>`). Verificar la mayúscula exacta con el SDK oficial.
-
-## 4. Peticiones relevantes
-
-**SearchItems** (`SearchItemsRequestContent`): `partnerTag` (obligatorio), `keywords`, `browseNodeId`, `searchIndex`, `brand`, `title`, `minPrice`, `maxPrice`, `minSavingPercent`, `minReviewsRating`, `availability` (`Available`|`IncludeOutOfStock`), `condition` (`Any`|`New`), `deliveryFlags` (`AmazonGlobal`, `FreeShipping`, `FulfilledByAmazon`, `Prime`), `sortBy` (`AvgCustomerReviews`, `Featured`, `NewestArrivals`, `Price:HighToLow`, `Price:LowToHigh`, `Relevance`), `itemCount`, `itemPage`, `languagesOfPreference`, `currencyOfPreference`, `resources`, `properties`.
-
-**GetItems** (`GetItemsRequestContent`): `partnerTag` y `itemIds` (obligatorios), `condition`, `currencyOfPreference`, `languagesOfPreference`, `resources`, `properties`.
-
-**`resources` útiles** (hay que pedirlos explícitamente; si no, no vienen en la respuesta):
-`itemInfo.title`, `itemInfo.byLineInfo`, `itemInfo.features`, `images.primary.large`, `customerReviews.count`, `customerReviews.starRating`, `browseNodeInfo.browseNodes`, `offersV2.listings.price`, `offersV2.listings.availability`, `offersV2.listings.condition`, `offersV2.listings.dealDetails`, `offersV2.listings.isBuyBoxWinner`, `offersV2.listings.merchantInfo`, `offersV2.listings.type`.
+| Parámetro | Notas |
+|---|---|
+| `searchIndex` | Por defecto `All` |
+| `browseNodeId` | **Uno por petición** |
+| `minPrice` / `maxPrice` | **En céntimos** (enteros) |
+| `minSavingPercent` | 1–99. Es el ahorro **según Amazon** |
+| `minReviewsRating` | Entero 1–4. **Es lo único que hay sobre valoraciones** (ver §5) |
+| `availability` | `Available` (por defecto) o `IncludeOutOfStock` |
+| `condition` | `Any` (por defecto) o `New`. **Usar `New`** |
+| `deliveryFlags` | `Prime`, `FreeShipping`, `FulfilledByAmazon`, `AmazonGlobal` |
+| `sortBy` | `AvgCustomerReviews`, `Featured`, `NewestArrivals`, `Price:HighToLow`, `Price:LowToHigh`, `Relevance` |
+| `languagesOfPreference` | `["es_ES"]` |
+| `resources` | Por defecto solo `itemInfo.title` |
 
 ### Correspondencia con los filtros de las temáticas
 
-| Filtro de la temática | Filtro de la API | Comprobación local |
+| Filtro de la temática | En la API | En local |
 |---|---|---|
 | Palabras clave | `keywords` | — |
-| Nodos de categoría | `browseNodeId` (uno por petición, así que se hace una búsqueda por nodo) | — |
-| Rango de precio | `minPrice` / `maxPrice` | Sí (unidades de la API por verificar: en PA-API eran céntimos) |
-| Descuento mínimo | `minSavingPercent` (descuento **según Amazon**) | Sí, **descuento real** con el histórico propio |
-| Valoración mínima | `minReviewsRating` | Sí, con `customerReviews.starRating` |
-| Nº mínimo de reseñas | — (no hay filtro) | Solo local, con `customerReviews.count` |
-| Exclusiones (palabras/marcas) | — | Solo local (título y `byLineInfo.brand`) |
+| Nodos de categoría | `browseNodeId` (una petición por nodo) | — |
+| Rango de precio | `minPrice` / `maxPrice` | Sí |
+| Descuento mínimo | `minSavingPercent` | Sí, con la lógica de §6 |
+| Valoración mínima | `minReviewsRating` (solo entero) | **No es posible**: la API no devuelve la valoración |
+| Nº mínimo de reseñas | — | **No es posible**: la API no lo devuelve |
+| Exclusiones | — | Sí, sobre el título y `byLineInfo.brand` |
 
-## 5. Respuesta: campos que usaremos
+## 5. Respuesta: recursos y campos
+
+Recursos documentados (hay que pedirlos explícitamente en `resources`): `browseNodeInfo.*`, `images.primary.{small,medium,large}`, `images.variants.*`, `itemInfo.{title,byLineInfo,features,classifications,…}`, `offersV2.listings.{price,availability,condition,dealDetails,isBuyBoxWinner,merchantInfo,type}`, `parentASIN` y `searchRefinements`.
+
+> ⚠️ **No hay recurso de reseñas.** `customerReviews` no figura entre los recursos documentados y en el ejemplo de respuesta oficial aparece como `null`. **Los filtros de "valoración mínima" y "número mínimo de reseñas" de la spec no se pueden aplicar con datos de la API**, salvo el filtro aproximado `minReviewsRating` en la búsqueda.
 
 ```
 Item
-├─ asin, parentASIN, detailPageURL        ← el enlace ya incluye el partnerTag enviado
-├─ itemInfo.title.displayValue
-├─ itemInfo.byLineInfo.brand.displayValue
+├─ asin, parentASIN
+├─ detailPageURL           ← enlace con tag y linkCode: NO MODIFICAR (§7)
+├─ itemInfo.title.displayValue, itemInfo.byLineInfo.brand.displayValue, itemInfo.features
 ├─ images.primary.large { url, width, height }
-├─ customerReviews { count, starRating.value }
-├─ browseNodeInfo.browseNodes[] { id, displayName, salesRank }
-└─ offersV2.listings[]
-   ├─ price
-   │  ├─ money { amount, currency, displayAmount }
-   │  ├─ pricePerUnit
-   │  ├─ savings { money, percentage }
-   │  └─ savingBasis { money, savingBasisType, savingBasisTypeLabel }
-   │        savingBasisType ∈ LIST_PRICE | LOWEST_PRICE | LOWEST_PRICE_STRIKETHROUGH | WAS_PRICE
+└─ offersV2.listings[]     ← solo la oferta destacada (buy box). Sin ofertas = sin stock
+   ├─ price.money { amount, currency, displayAmount }
+   ├─ price.pricePerUnit
+   ├─ price.savingBasis { money, savingBasisType, savingBasisTypeLabel }
+   │     savingBasisType ∈ LIST_PRICE | LOWEST_PRICE | LOWEST_PRICE_STRIKETHROUGH | WAS_PRICE
+   ├─ price.savings { money, percentage }     ← savings = money − savingBasis
    ├─ availability { type, message, minOrderQuantity, maxOrderQuantity }
-   ├─ condition { value, subCondition, conditionNote }
-   ├─ dealDetails { accessType, badge, startTime, endTime, percentClaimed, earlyAccessDurationInMilliseconds }
-   ├─ isBuyBoxWinner, merchantInfo { id, name }, violatesMAP
-   └─ type ∈ HAUL | SUBSCRIBE_AND_SAVE | LIGHTNING_DEAL
+   │     type ∈ IN_STOCK | IN_STOCK_SCARCE | LEADTIME | OUT_OF_STOCK | PREORDER | AVAILABLE_DATE | UNAVAILABLE | UNKNOWN
+   ├─ condition { value: New|Used|Refurbished|Unknown, subCondition, conditionNote }
+   ├─ dealDetails { accessType: ALL|PRIME_EARLY_ACCESS|PRIME_EXCLUSIVE, badge, startTime, endTime, percentClaimed, … }
+   │     ← si existe, la oferta está activa en ese momento
+   ├─ isBuyBoxWinner, merchantInfo { id, name }
+   ├─ type ∈ LIGHTNING_DEAL | SUBSCRIBE_AND_SAVE   (ausente en ofertas normales)
+   └─ violatesMAP          ← true: no se puede mostrar el precio
 ```
 
-Implicaciones para el diseño:
-- **`savingBasisType` es muy útil para detectar descuentos inflados.** No es lo mismo un descuento sobre `LIST_PRICE` (PVPR, a menudo inflado) que sobre `WAS_PRICE` o `LOWEST_PRICE` (precio anterior real). Hay que guardarlo en cada instantánea.
-- Usar el listing con `isBuyBoxWinner = true` como precio de referencia.
-- Descartar `type = SUBSCRIBE_AND_SAVE` como oferta normal, porque es un precio condicionado.
-- `dealDetails` (ofertas flash, *badge*, `endTime`, `percentClaimed`) da contexto al mensaje y fija una caducidad natural.
-- `violatesMAP = true` indica que el precio no se puede mostrar (*Minimum Advertised Price*): **no publicar** el precio en ese caso.
-- `customerReviews` aparece en el SDK. En la PA-API 5 este recurso devolvía datos de forma muy limitada; **verificar con datos reales** que llega relleno en amazon.es. Si no llega, los filtros de valoración y reseñas no se podrán aplicar.
-- `detailPageURL` lleva el `partnerTag` de la petición. Para tener un tracking ID por canal hay dos opciones: (a) pedir con el tag de cada canal (multiplica las llamadas) o (b) **reescribir el parámetro `tag` del enlace** al generar el mensaje de cada canal. Se elige **(b)**. Verificar en los términos que reescribir el tag está permitido (es un enlace de afiliado estándar sin redirección, así que en principio sí).
+- Las respuestas con HTTP 200 pueden traer `errors[]` parciales (p. ej. un ASIN no encontrado dentro de un lote).
+- El precio corresponde a una dirección de envío estándar del marketplace y puede diferir del que ve cada cliente.
 
-## 6. Límites de peticiones (doc oficial)
+## 6. Detección de ofertas: qué permite la API
 
-- Al crear las credenciales: **1 TPS y 8.640 TPD** durante los primeros 30 días.
-- Después: 1 TPD por cada 0,05 $ y 1 TPS (máximo 10) por cada 4.320 $ de ingresos por envíos generados vía la API en los últimos 30 días. Se recalcula a diario.
-  - Si los ingresos vía la API son bajos, **la cuota puede ser menor que la inicial**. Hay que diseñar con un presupuesto de llamadas configurable.
-- Una llamada a GetItems con 10 ASIN = 1 transacción. **Agrupar siempre por lotes de 10.**
-- Errores: `ThrottleException` (con `serviceCode` y `quotaCode`), `UnauthorizedException` (`TokenExpired`, `InvalidToken`…), `ValidationException` (`InvalidPartnerTag`, `InvalidAssociate`…), `AccessDeniedException` (`AssociateNotEligible`…), `ResourceNotFoundException`, `InternalServerException`.
-  - Solo se reintenta (con backoff) ante throttling y errores 5xx. Con `TokenExpired` se renueva el token una vez. El resto de errores no se reintentan y se registran.
+- `savingBasisType` indica **respecto a qué** se calcula el descuento:
+  - `LIST_PRICE`: PVP recomendado. Es el más propenso a inflarse.
+  - `WAS_PRICE` / `LOWEST_PRICE` / `LOWEST_PRICE_STRIKETHROUGH`: precio de referencia real calculado por Amazon.
+- En la UE, la normativa Ómnibus obliga a que el precio tachado de una rebaja sea el **más bajo de los últimos 30 días**. Es razonable esperar que en amazon.es `LOWEST_PRICE` refleje eso. **Verificar con datos reales** antes de basar la lógica en ello.
+- Señales de oferta sospechosa: base `LIST_PRICE`, `type = SUBSCRIBE_AND_SAVE`, `condition ≠ New`, `isBuyBoxWinner = false` o `violatesMAP = true`.
+- `dealDetails.endTime` permite fijar la caducidad de la candidata antes de las 24 h.
 
-**Presupuesto estimado** por escaneo diario: temáticas × (nodos + bloques de palabras clave) × páginas, más los GetItems de recomprobación (lotes de 10). Con 1 TPS, en un Worker hay que **serializar las llamadas** (cola o bucle con espera) y vigilar el límite de tiempo de CPU/duración del cron.
+## 7. Normas de la Licencia y del Acuerdo de amazon.es que afectan al diseño
 
-## 7. Normas de uso relevantes
+Estas cláusulas **cambian requisitos de la spec**. Se citan en resumen; el texto literal está en las fuentes de §0.
 
-- La doc oficial dice que las aplicaciones deben **dirigir ventas a Amazon**; las que no cumplan los términos pierden el acceso.
-- **No se ha podido confirmar** en la documentación oficial una regla concreta de caché de precios (*"24 horas"*). Los 24 h aparecen en fuentes de terceros. Mantenemos la caducidad de 24 h de la spec como **política propia conservadora** y mostramos siempre la fecha y hora de consulta. Hay que verificarlo en el *Creators API License Agreement* de amazon.es.
-- Imágenes: no se ha encontrado la cláusula concreta. Mientras tanto, **no se almacenan copias** (sin R2 para imágenes de producto) y se usa la URL de la API.
+1. **Solo se pueden mostrar precios obtenidos de la API** *(Políticas, "Los precios y la disponibilidad del Producto podrán variar…")*. Se puede mostrar precio y disponibilidad solo si (a) Amazon facilita el enlace que los muestra o (b) se obtienen vía la Creators API / PA-API cumpliendo la Licencia.
+   → **Un precio tecleado a mano (`ManualProvider`) no se puede publicar.**
+2. **Caché máxima de 24 h y prohibición de guardar imágenes** *(Licencia 2.c.h)*:
+   - Prohibido guardar o cachear imágenes; solo se puede guardar el **enlace** a la imagen, durante 24 h como máximo.
+   - El resto del contenido de la API se puede cachear **≤ 24 h** y después hay que refrescarlo.
+   - Los **ASIN** se pueden guardar indefinidamente.
+   - La doc técnica recomienda además un TTL de **1 hora para las ofertas** (*Best programming practices*).
+3. **Prohibido acumular o analizar contenido de la API sin autorización escrita** *(Licencia 2.c.e)*: *"no accederá a Creators API […] con el fin de acumular, analizar, extraer o readaptar ningún Contenido Publicitario del Producto"*.
+   → **Un histórico propio de precios de 30 días con datos de la API choca con esto y con la caché de 24 h.**
+4. **Prohibido ofrecer seguimiento o alertas de precio** *(Políticas, (y))*: *"Salvo que Amazon acuerde otra cosa, su Sitio no deberá tener funcionalidad de seguimiento de precios y/o de alertas de precio."*
+   → No publicar mensajes del tipo "mínimo histórico" ni gráficas de precio.
+5. **Fecha y hora y descargo obligatorios junto al precio** *(Licencia 2.c.i)*:
+   - Hay que incluir la marca de fecha y hora de consulta si el precio no se refresca al menos cada hora. La fecha puede omitirse si es del mismo día.
+   - Y el descargo literal (o enlazado): *"Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra."*
+6. **No modificar los enlaces que devuelve la API** *(API rates; Best programming practices)*: *"Alterations of any kind to vended links will lead to missing attribution"*.
+   → **El tracking ID por canal se consigue pasando el tracking ID del canal como `partnerTag` en la petición**, no reescribiendo el parámetro `tag`.
+7. **Los canales deben ser "Sitios" declarados** *(Políticas, (b))*: no se pueden mostrar enlaces con tu tag *"en un sitio que no sea su Sitio"*.
+   → Cada canal de Telegram y WhatsApp tiene que estar dado de alta en Associates Central.
+8. **Mensajería permitida si es solicitada** *(Políticas, Actividades de Promoción)*: se pueden incluir enlaces en correos, SMS y mensajes directos desde tus perfiles sociales **siempre que el destinatario haya optado por recibirlos**. Un canal al que el usuario se suscribe encaja; **no enviar a chats o grupos que no lo hayan pedido**.
+9. **Contenido de la API en plataformas que exigen sublicencia** *(Políticas, (b))*: no se puede usar el contenido del programa en plataformas, *incluidas redes sociales*, que exijan sublicenciar o ceder derechos a terceros. **Subir la imagen de Amazon a Telegram o WhatsApp es una zona gris**; ver la propuesta en `SPEC.md` §13.
+10. **No modificar el contenido del programa** *(Políticas, (a))*: se puede **truncar** el texto (p. ej. el título) sin cambiar su sentido y redimensionar imágenes manteniendo la proporción. **El LLM no debe reescribir el título ni las características**; solo puede redactar texto propio alrededor, sin afirmaciones inexactas.
+11. **Aviso de afiliado literal** *(Acuerdo)*: *"En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables"*, de forma clara y destacada. Coincide con la spec.
+12. **Uso en móvil** *(Licencia 2.c.d)*: sin autorización no se puede usar el contenido de la API en páginas o apps *diseñadas para móvil*. Es un back office privado, pero **conviene consultarlo con soporte de Afiliados**, igual que el uso en apps de mensajería.
+13. **Enlaces de redirección y acortadores propios**: prohibidos, como ya decía la spec.
+14. **Agentes** *(Políticas, "Agentes")*: si un agente automatizado accede al contenido del programa, debe identificarse en el *user agent* (`Agent/<nombre>`). Las llamadas a la API ya van autenticadas, pero **nunca se accede a las páginas de amazon.es** (tampoco para generar vistas previas).
 
-## 8. Decisión para el proyecto
+## 8. Límites de peticiones
 
-- Se diseña `ProductProvider` alineado con este modelo, pero **sin acoplar el dominio a los nombres de la API**. El dominio usa un `ProductSnapshot` propio y el `CreatorsApiProvider` traduce.
-- El `MockProvider` devuelve fixtures con **la forma de la respuesta de la Creators API** (§5) y pasa por el mismo mapper. Así, el día que haya credenciales, solo cambia el transporte.
-- La fase 2 empieza por un *spike*: obtener el token, hacer un GetItems de 1 ASIN en amazon.es y guardar la respuesta real como fixture para contrastar este documento.
+- **Inicial:** 1 TPS y 8.640 TPD durante los primeros 30 días.
+- **Después:** 1 TPD por cada 0,05 $ y 1 TPS (máximo 10) por cada 4.320 $ de ingresos por envíos atribuidos a la API en los últimos 30 días. Se recalcula a diario.
+  - **Con pocas ventas, la cuota puede ser mucho menor que la inicial.** El presupuesto de llamadas tiene que ser configurable y visible en el panel.
+- La atribución exige usar la cuenta principal, pasar siempre `partnerTag` y **no editar los parámetros de las URLs** devueltas.
+- **Errores** (todos con `type`, `message` y, según el caso, `reason`):
+
+| HTTP | Tipo | Qué hacer |
+|---|---|---|
+| 400 | `ValidationException` (`InvalidPartnerTag`, `InvalidAssociate`, `FieldValidationFailed`…) | No reintentar. Registrar y avisar en el panel |
+| 401 | `UnauthorizedException` (`TokenExpired`, `InvalidToken`…) | Renovar el token **una vez** y reintentar |
+| 403 | `AccessDeniedException` (`AssociateNotEligible`…) | Marcar el proveedor como no disponible y degradar a modo sin API |
+| 404 | `ResourceNotFoundException` | No reintentar |
+| 429 | `ThrottleException` (puede traer `retryAfterSeconds`) | Backoff exponencial, respetando `retryAfterSeconds` |
+| 500 | `InternalServerException` | Backoff exponencial, con un número limitado de intentos |
+
+- **Presupuesto por escaneo:** Σ temáticas × (nodos + consultas) × páginas, más ⌈candidatas/10⌉ GetItems **por cada tracking ID de canal** al publicar. Con 1 TPS, las llamadas van **en serie**, repartidas en el tiempo.
+
+## 9. Decisión para el proyecto
+
+- El dominio usa un `ProductSnapshot` propio. `CreatorsApiProvider` traduce desde `offersV2`. `MockProvider` devuelve fixtures con **la forma exacta de §5** y pasa por el mismo mapper.
+- La fase 2 empieza con un *spike*: token LwA 3.2, un GetItems de 1 ASIN en amazon.es y guardar la respuesta real como fixture. Hay que confirmar:
+  - el significado de `LOWEST_PRICE` en España;
+  - que `customerReviews` no llega;
+  - el formato de `detailPageURL`.
