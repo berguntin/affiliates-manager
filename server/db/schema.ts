@@ -92,8 +92,11 @@ export const manualProducts = sqliteTable(
     brand: text('brand'),
     /** Texto propio para el mensaje. */
     note: text('note').notNull().default(''),
-    /** Nota interna: NUNCA se publica (SPEC §14.1). */
-    internalPriceCents: integer('internal_price_cents'),
+    /**
+     * Precio introducido a mano. Se publica con la fecha y hora del alta (SPEC §14.7,
+     * riesgo aceptado). La columna conserva su nombre original.
+     */
+    priceCents: integer('internal_price_cents'),
     /** Se marca al convertirlo en candidata. */
     consumedAt: timestamp('consumed_at'),
     createdAt: timestamp('created_at').notNull().default(now),

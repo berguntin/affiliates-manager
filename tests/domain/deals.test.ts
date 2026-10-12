@@ -113,6 +113,20 @@ describe('evaluateDeal', () => {
     expect(r.notes).toContain('Alta manual: se publica sin precio')
   })
 
+  it('acepta altas manuales con precio sin exigir descuento', () => {
+    const r = evaluateDeal(
+      snapshot({ source: 'manual', offer: offer({ savingBasisType: null, savingBasisCents: null, savingsPercent: null }) }),
+      filters,
+    )
+    expect(r.eligible).toBe(true)
+    expect(r.effectiveDiscountPct).toBeNull()
+    expect(r.notes).toContain('Alta manual: precio introducido a mano')
+  })
+
+  it('a las altas manuales sí les aplica las exclusiones', () => {
+    expect(evaluateDeal(snapshot({ source: 'manual', offer: null }), { ...filters, excludeBrands: ['dodot'] }).eligible).toBe(false)
+  })
+
   it('rechaza productos sin oferta que vienen de la API', () => {
     const r = evaluateDeal(snapshot({ offer: null }), filters)
     expect(r.eligible).toBe(false)

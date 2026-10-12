@@ -92,12 +92,13 @@ export function evaluateDeal(
   if (excluded) rejections.push(excluded)
 
   const offer = snapshot.offer
+  // Las altas manuales son una selección explícita: no se aplican filtros de oferta.
+  if (snapshot.source === 'manual') {
+    notes.push(offer ? 'Alta manual: precio introducido a mano' : 'Alta manual: se publica sin precio')
+    return result('none', null, false)
+  }
   if (!offer) {
-    if (snapshot.source === 'manual') {
-      notes.push('Alta manual: se publica sin precio')
-    } else {
-      rejections.push('Sin oferta disponible')
-    }
+    rejections.push('Sin oferta disponible')
     return result('none', null, false)
   }
 

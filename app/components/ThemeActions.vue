@@ -35,7 +35,7 @@ const manual = reactive({
   title: '',
   brand: '',
   note: '',
-  internalPriceCents: null as number | null,
+  priceCents: null as number | null,
 })
 
 const { data: recent, refresh: refreshRecent } = await useFetch<
@@ -51,7 +51,7 @@ async function addManual() {
         title: manual.title,
         brand: manual.brand.trim() || null,
         note: manual.note,
-        internalPriceCents: manual.internalPriceCents,
+        priceCents: manual.priceCents,
       },
     }),
   )
@@ -62,7 +62,7 @@ async function addManual() {
     color: result.created ? 'success' : 'warning',
     actions: result.created ? [{ label: 'Ver cola', to: '/cola' }] : undefined,
   })
-  Object.assign(manual, { asinOrUrl: '', title: '', brand: '', note: '', internalPriceCents: null })
+  Object.assign(manual, { asinOrUrl: '', title: '', brand: '', note: '', priceCents: null })
   await refreshRecent()
 }
 </script>
@@ -81,7 +81,7 @@ async function addManual() {
     <UCard v-else>
       <template #header>
         <h2 class="font-medium">Alta manual de producto</h2>
-        <p class="text-xs text-muted">Se crea la candidata al momento. Se publica sin precio (SPEC §14.1).</p>
+        <p class="text-xs text-muted">Se crea la candidata al momento. Si indicas precio, se publica con la fecha y hora del alta.</p>
       </template>
       <form class="space-y-3" @submit.prevent="addManual">
         <UFormField label="URL de amazon.es o ASIN" required>
@@ -100,8 +100,8 @@ async function addManual() {
           <UFormField label="Marca">
             <UInput v-model="manual.brand" class="w-full" />
           </UFormField>
-          <UFormField label="Precio visto (nota interna)" help="Nunca se publica.">
-            <EuroInput v-model="manual.internalPriceCents" placeholder="Opcional" />
+          <UFormField label="Precio actual" help="Opcional. Se publica con la fecha y hora de ahora.">
+            <EuroInput v-model="manual.priceCents" placeholder="Opcional" />
           </UFormField>
         </div>
         <UFormField label="Texto propio" help="Por qué lo recomiendas. Aparece en el mensaje.">

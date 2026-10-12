@@ -89,7 +89,8 @@ export const manualProductInputSchema = z.object({
   title: z.string().trim().min(3).max(300),
   brand: z.string().trim().max(100).nullable().default(null),
   note: z.string().trim().max(500).default(''),
-  internalPriceCents: z.number().int().min(0).nullable().default(null),
+  /** Precio visto ahora en Amazon; se publica con la fecha y hora del alta. */
+  priceCents: z.number().int().min(1).nullable().default(null),
 })
 
 export type ManualProductInput = z.input<typeof manualProductInputSchema>

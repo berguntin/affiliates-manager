@@ -7,6 +7,10 @@ export interface ManualProductRecord {
   title: string
   brand: string | null
   note: string
+  /** Precio introducido a mano (null = se publica sin precio). */
+  priceCents: number | null
+  /** Momento del alta: es la «hora de consulta» del precio. */
+  createdAt: number
 }
 
 /** Acceso a las altas manuales; lo implementa el servicio con D1. */
@@ -16,12 +20,13 @@ export interface ManualProductSource {
 }
 
 /**
- * Productos dados de alta a mano en el panel. Nunca devuelve precio: sin la API
- * no se puede publicar precio (SPEC §14.1). El enlace es el estándar de Afiliados.
+ * Productos dados de alta a mano (panel o bot buzón). Si se indicó precio, se publica
+ * con la fecha y hora del alta (SPEC §14.7, riesgo aceptado); si no, sin precio.
+ * El enlace es el estándar de Afiliados.
  */
 export class ManualProvider implements ProductProvider {
   readonly id = 'manual' as const
-  readonly capabilities = { prices: false }
+  readonly capabilities = { prices: true }
 
   constructor(
     private readonly source: ManualProductSource,
@@ -32,12 +37,28 @@ export class ManualProvider implements ProductProvider {
     return {
       asin: record.asin,
       source: 'manual',
-      capturedAt: this.now(),
+      capturedAt: record.priceCents != null ? record.createdAt : this.now(),
       title: record.title,
       brand: record.brand,
       detailPageUrl: buildManualLink(record.asin, partnerTag),
       imageUrl: null,
-      offer: null,
+      offer:
+        record.priceCents != null
+          ? {
+              priceCents: record.priceCents,
+              currency: 'EUR',
+              savingBasisCents: null,
+              savingBasisType: null,
+              savingsPercent: null,
+              availability: null,
+              condition: 'New',
+              isBuyBoxWinner: true,
+              dealType: null,
+              dealBadge: null,
+              dealEndsAt: null,
+              violatesMap: false,
+            }
+          : null,
       note: record.note,
     }
   }

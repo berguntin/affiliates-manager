@@ -35,7 +35,7 @@ export async function addManualProduct(
     title: string
     brand: string | null
     note: string
-    internalPriceCents: number | null
+    priceCents: number | null
   },
 ) {
   const id = crypto.randomUUID()

@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
     title: input.title,
     brand: input.brand,
     note: input.note,
-    internalPriceCents: input.internalPriceCents,
+    priceCents: input.priceCents,
   })
   const { result, runId } = await withRun(db, 'scan', 'manual', themeId, (log) =>
     scanTheme(db, theme, log, { timezone: useTimezone(), copywriter: createCopywriter(useEnv()) }),

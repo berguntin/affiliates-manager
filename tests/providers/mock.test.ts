@@ -112,11 +112,32 @@ describe('MockProvider', () => {
 })
 
 describe('ManualProvider', () => {
-  it('nunca devuelve precio y construye el enlace con el tag del canal', async () => {
+  it('publica el precio introducido a mano con la hora del alta', async () => {
+    const createdAt = Date.UTC(2026, 9, 12, 7, 30)
     const provider = new ManualProvider(
       {
-        pendingForTheme: async () => [{ asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: 'Mi nota' }],
-        latestByAsin: async () => [{ asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '' }],
+        pendingForTheme: async () => [
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: 2999, createdAt },
+        ],
+        latestByAsin: async () => [],
+      },
+      now,
+    )
+    const [found] = await provider.search(query)
+    expect(found!.offer?.priceCents).toBe(2999)
+    expect(found!.capturedAt).toBe(createdAt)
+    expect(found!.offer?.savingsPercent).toBeNull()
+  })
+
+  it('sin precio no devuelve oferta y construye el enlace con el tag del canal', async () => {
+    const provider = new ManualProvider(
+      {
+        pendingForTheme: async () => [
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: 'Mi nota', priceCents: null, createdAt: 1 },
+        ],
+        latestByAsin: async () => [
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: null, createdAt: 1 },
+        ],
       },
       now,
     )
