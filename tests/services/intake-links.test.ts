@@ -22,6 +22,17 @@ describe('resolveShortLink', () => {
     expect(await resolveShortLink('https://amzn.eu/d/abc', fetchFn)).toBe('B08N5WRWNW')
   })
 
+  it('resuelve link.amazon → amzlinks.in → amazon.es (enlace compartido por la app)', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(redirect('https://amzlinks.in/B067ikL8E'))
+      .mockResolvedValueOnce(
+        redirect('https://www.amazon.es/dp/B0GTLLDXNX/ref=cm_sw_r_as_gl_api?linkCode=ml1&tag=otro-21'),
+      )
+    expect(await resolveShortLink('https://link.amazon/B067ikL8E', fetchFn)).toBe('B0GTLLDXNX')
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+
   it('se detiene si la redirección lleva a amazon.es sin ASIN (no abre la página)', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(redirect('https://www.amazon.es/s?k=pañales'))
     expect(await resolveShortLink('https://amzn.eu/d/abc', fetchFn)).toBeNull()

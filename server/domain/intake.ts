@@ -6,7 +6,7 @@ import { parseAsin } from './affiliate'
 import { truncate } from './text'
 
 /** Dominios de enlaces cortos de Amazon: solo se resuelve su redirección (nunca la página). */
-export const SHORT_LINK_HOSTS = ['amzn.eu', 'amzn.to', 'a.co'] as const
+export const SHORT_LINK_HOSTS = ['amzn.eu', 'amzn.to', 'a.co', 'link.amazon', 'amzlinks.in'] as const
 
 export interface TelegramEntity {
   type: string
@@ -28,7 +28,9 @@ export function extractUrls(text: string, entities: TelegramEntity[] = []): stri
 
 export function isShortLink(url: string): boolean {
   try {
-    return (SHORT_LINK_HOSTS as readonly string[]).includes(new URL(url).hostname.replace(/^www\./, ''))
+    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase()
+    // `.amazon` es el dominio propio de Amazon (p. ej. link.amazon, el de la app al compartir)
+    return (SHORT_LINK_HOSTS as readonly string[]).includes(host) || host.endsWith('.amazon')
   } catch {
     return false
   }

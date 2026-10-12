@@ -28,6 +28,7 @@ describe('enlaces compartidos', () => {
   it('usa el ASIN de amazon.es directamente y deja los enlaces cortos para resolver', () => {
     expect(pickAmazonUrl(['https://www.amazon.es/dp/B08N5WRWNW?ref=x'])).toEqual({ asin: 'B08N5WRWNW' })
     expect(pickAmazonUrl(['https://amzn.eu/d/abc123X'])).toEqual({ shortUrl: 'https://amzn.eu/d/abc123X' })
+    expect(pickAmazonUrl(['https://link.amazon/B067ikL8E'])).toEqual({ shortUrl: 'https://link.amazon/B067ikL8E' })
     expect(pickAmazonUrl(['https://example.com/x'])).toBeNull()
   })
 
