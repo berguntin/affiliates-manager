@@ -42,6 +42,11 @@ describe('nextSlot', () => {
     expect(nextSlot({ ...base, taken: [monday8 + H] })).toBe(monday8 + H + 30 * M)
   })
 
+  it('solo propone horas de ciclo de la cola aunque ahora no lo sea', () => {
+    const slot = nextSlot({ ...base, now: monday8 + H + 3 * M, windows: [] })
+    expect(slot).toBe(monday8 + H + 10 * M) // 09:03 → 09:10
+  })
+
   it('respeta el límite diario y pasa al día siguiente si cabe antes del plazo', () => {
     const taken = [monday8 + H, monday8 + 90 * M, monday8 + 2 * H]
     expect(nextSlot({ ...base, taken, deadline: monday8 + 30 * H })).toBe(monday8 + 25 * H) // martes 09:00

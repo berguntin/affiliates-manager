@@ -1,3 +1,4 @@
+import { QUEUE_TICK_MINUTES, alignToTick } from '../../shared/queue-cycle'
 import type { PublishWindow } from '../../shared/types'
 
 const MINUTE = 60_000
@@ -76,14 +77,15 @@ export interface SlotParams {
 export function nextSlot(params: SlotParams): number | null {
   const { now, windows, timezone, taken, dailyLimit, deadline } = params
   const gap = (params.minGapMinutes ?? 30) * MINUTE
-  const step = (params.stepMinutes ?? 5) * MINUTE
+  // Por defecto, solo horas en las que la cola se ejecuta de verdad.
+  const step = (params.stepMinutes ?? QUEUE_TICK_MINUTES) * MINUTE
   const perDay = new Map<string, number>()
   for (const t of taken) {
     const key = localParts(t, timezone).dateKey
     perDay.set(key, (perDay.get(key) ?? 0) + 1)
   }
 
-  for (let t = Math.ceil(now / step) * step; t < deadline; t += step) {
+  for (let t = Math.max(alignToTick(now), Math.ceil(now / step) * step); t < deadline; t += step) {
     if (!isInWindows(t, windows, timezone)) continue
     if ((perDay.get(localParts(t, timezone).dateKey) ?? 0) >= dailyLimit) continue
     if (taken.some((x) => Math.abs(x - t) < gap)) continue

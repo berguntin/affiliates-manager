@@ -22,3 +22,9 @@ export const WEEKDAYS = [
   { value: 6, short: 'S', label: 'Sábado' },
   { value: 7, short: 'D', label: 'Domingo' },
 ] as const
+
+const time = new Intl.DateTimeFormat('es-ES', { timeStyle: 'short', timeZone: 'Europe/Madrid' })
+
+export function formatTime(ms: number): string {
+  return time.format(new Date(ms))
+}

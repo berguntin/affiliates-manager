@@ -39,7 +39,7 @@ async function trigger(kind: 'scan' | 'tick') {
       />
     </div>
     <p class="text-sm text-muted">
-      El cron escanea todas las temáticas activas cada día a las 05:00 UTC y procesa la cola cada 10 minutos
+      El cron escanea todas las temáticas activas cada día a las 05:00 UTC y procesa la cola cada 10 minutos (:00, :10, :20…)
       (publica lo programado, caduca y purga). Puedes lanzarlo a mano:
     </p>
     <div class="flex flex-wrap gap-2">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RELIABILITY_LABELS, STATUS_LABELS, type QueueItem } from '#shared/api'
+import { QUEUE_TICK_MINUTES, alignToTick, nextTick } from '#shared/queue-cycle'
 
 const props = defineProps<{ item: QueueItem; readonly?: boolean }>()
 const emit = defineEmits<{ changed: [item: QueueItem] }>()
@@ -59,10 +60,27 @@ async function saveEdit() {
 
 // --- Programar ---
 const scheduleOpen = ref(false)
-const scheduleMode = ref<'auto' | 'manual'>('auto')
+const scheduleMode = ref<'next' | 'auto' | 'manual'>('next')
 const scheduleAt = ref('')
+const now = ref(Date.now())
+const nextCycle = computed(() => nextTick(now.value))
+const manualCycle = computed(() => (scheduleAt.value ? alignToTick(new Date(scheduleAt.value).getTime()) : null))
+const scheduleItems = computed(() => [
+  { label: `Próximo ciclo de publicación (${formatTime(nextCycle.value)})`, value: 'next' },
+  { label: 'Siguiente hueco libre en las franjas de la temática', value: 'auto' },
+  { label: 'A una hora concreta', value: 'manual' },
+])
+function openSchedule() {
+  now.value = Date.now()
+  scheduleOpen.value = true
+}
 async function saveSchedule() {
-  const scheduledAt = scheduleMode.value === 'manual' && scheduleAt.value ? new Date(scheduleAt.value).getTime() : null
+  const scheduledAt =
+    scheduleMode.value === 'next'
+      ? nextCycle.value
+      : scheduleMode.value === 'manual' && scheduleAt.value
+        ? new Date(scheduleAt.value).getTime()
+        : null
   const updated = await run(
     () =>
       apiFetch<QueueItem>(`/api/publications/${props.item.id}/action`, {
@@ -180,7 +198,7 @@ async function markPublished() {
       <UBadge v-if="item.suspicious" label="Sospechosa" color="error" variant="subtle" icon="i-lucide-triangle-alert" />
       <UBadge
         v-if="item.status === 'programada' && item.scheduledAt"
-        :label="`Programada ${formatDateTime(item.scheduledAt)}`"
+        :label="isTelegram ? `Se publica ${formatDateTime(item.scheduledAt)}` : `Recordatorio ${formatDateTime(item.scheduledAt)} (publicación manual)`"
         color="info"
         variant="subtle"
         icon="i-lucide-clock"
@@ -254,7 +272,7 @@ async function markPublished() {
           icon="i-lucide-calendar-clock"
           size="sm"
           variant="soft"
-          @click="scheduleOpen = true"
+          @click="openSchedule"
         />
       </template>
       <UButton
@@ -295,22 +313,31 @@ async function markPublished() {
 
     <UModal v-model:open="scheduleOpen" title="Programar publicación">
       <template #body>
-        <URadioGroup
-          v-model="scheduleMode"
-          :items="[
-            { label: 'Siguiente hueco libre en las franjas de la temática', value: 'auto' },
-            { label: 'A una hora concreta', value: 'manual' },
-          ]"
-        />
-        <UInput v-if="scheduleMode === 'manual'" v-model="scheduleAt" type="datetime-local" class="mt-3 w-full" />
+        <URadioGroup v-model="scheduleMode" :items="scheduleItems" />
+        <template v-if="scheduleMode === 'manual'">
+          <UInput v-model="scheduleAt" type="datetime-local" step="600" class="mt-3 w-full" />
+          <p v-if="manualCycle && manualCycle >= item.expiresAt" class="mt-2 text-sm text-error">
+            A esa hora la oferta ya habrá caducado. Elige una hora anterior.
+          </p>
+          <p v-else-if="manualCycle" class="mt-2 text-sm">
+            Se publicará a las <b>{{ formatDateTime(manualCycle) }}</b> (ciclo de la cola).
+          </p>
+        </template>
         <p class="mt-3 text-xs text-muted">
+          La cola publica cada {{ QUEUE_TICK_MINUTES }} minutos (:00, :10, :20…), así que las horas se ajustan al
+          ciclo siguiente.
           Debe publicarse antes de que caduque ({{ formatDateTime(item.expiresAt) }}).
           <template v-if="!isTelegram">En WhatsApp te avisará la cola, pero la publicación es manual.</template>
         </p>
       </template>
       <template #footer>
         <UButton label="Cancelar" color="neutral" variant="ghost" @click="scheduleOpen = false" />
-        <UButton label="Programar" :loading="pending" @click="saveSchedule" />
+        <UButton
+          label="Programar"
+          :loading="pending"
+          :disabled="scheduleMode === 'manual' && (!manualCycle || manualCycle >= item.expiresAt)"
+          @click="saveSchedule"
+        />
       </template>
     </UModal>
 

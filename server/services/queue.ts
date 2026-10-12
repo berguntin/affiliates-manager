@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm'
+import { alignToTick, nextTick } from '../../shared/queue-cycle'
 import type { ChannelType, PublicationStatus } from '../../shared/types'
 import { getChannelAdapter } from '../channels'
 import { evaluateDeal } from '../domain/deals'
@@ -160,10 +161,12 @@ export async function applyAction(
     }
     case 'schedule': {
       if (item.needsReview) throw new QueueError('Revisa el cambio de precio antes de programar')
-      const scheduledAt = payload.scheduledAt ?? (await suggestSlot(db, item, ctx.timezone, now))
-      if (scheduledAt == null) throw new QueueError('No hay huecos libres en las franjas antes de que caduque')
+      // Toda hora se ajusta al ciclo de la cola: es cuando se publicará de verdad.
+      const requested = payload.scheduledAt ?? (await suggestSlot(db, item, ctx.timezone, now))
+      if (requested == null) throw new QueueError('No hay huecos libres en las franjas antes de que caduque')
+      if (requested < now - 60_000) throw new QueueError('La hora elegida ya ha pasado', 400)
+      const scheduledAt = Math.max(alignToTick(requested), nextTick(now))
       if (scheduledAt >= item.expiresAt) throw new QueueError('La hora elegida es posterior a la caducidad')
-      if (scheduledAt < now - 60_000) throw new QueueError('La hora elegida ya ha pasado', 400)
       await setStatus(db, id, to, { scheduledAt })
       break
     }
