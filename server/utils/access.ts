@@ -24,7 +24,7 @@ export async function verifyAccessToken(token: string, config: AccessConfig): Pr
     jwks = createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`))
     jwksByTeam.set(issuer, jwks)
   }
-  const { payload } = await jwtVerify(token, jwks, { issuer, audience: config.audience })
+  const { payload } = await jwtVerify(token, jwks, { issuer, audience: config.audience.trim() })
   const email = typeof payload.email === 'string' ? payload.email.toLowerCase() : ''
   if (!email || !config.allowedEmails.includes(email)) {
     throw new Error('Email no autorizado')

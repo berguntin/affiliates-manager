@@ -38,7 +38,10 @@ export default defineEventHandler(async (event) => {
     event.context.userEmail = await verifyAccessToken(token, { teamDomain, audience, allowedEmails })
   } catch (error) {
     // El motivo exacto (AUD, emisor, email…) va al log del Worker, no a la respuesta.
-    console.warn(`[auth] JWT de Access rechazado: ${(error as Error).message}`)
+    // El dominio del equipo no es secreto y permite detectar un AUTH_TEAM_DOMAIN erróneo.
+    console.warn(
+      `[auth] JWT de Access rechazado (equipo ${normalizeTeamDomain(teamDomain)}): ${(error as Error).message}`,
+    )
     throw createError({ statusCode: 401, message: 'No autorizado', data: { code: 'auth_invalid' } })
   }
 })
