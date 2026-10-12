@@ -133,6 +133,16 @@ export async function scanTheme(
     return 0
   }
   log.count('encontrados', snapshots.length)
+  if (snapshots.length === 0) {
+    log.error(
+      theme.provider === 'manual'
+        ? `${label}: no hay altas manuales pendientes (añádelas desde la ficha de la temática)`
+        : theme.provider === 'mock'
+          ? `${label}: el catálogo simulado no tiene productos para esas palabras clave y categoría (prueba «pañales», «cochecito», «auriculares» o «freidora»)`
+          : `${label}: la búsqueda no devolvió productos (revisa palabras clave, nodos y filtros)`,
+    )
+    return 0
+  }
 
   const filters = {
     minDiscountPct: theme.minDiscountPct,
@@ -278,6 +288,7 @@ export async function scanTheme(
 export async function scanAllThemes(db: Db, log: RunLog, options: ScanOptions): Promise<void> {
   const active = (await listThemes(db)).filter((t) => t.active)
   log.count('tematicas', active.length)
+  if (active.length === 0) log.error('No hay temáticas activas')
   for (const theme of active) {
     try {
       await scanTheme(db, theme, log, options)

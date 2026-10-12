@@ -123,7 +123,7 @@ async function remove() {
           <UFormField
             label="Fuente de productos"
             name="provider"
-            help="Sin acceso a la API, usa «Alta manual»: se publica sin precio (SPEC §14.1)."
+            :help="state.provider === 'mock' ? 'Catálogo de ejemplo (~30 productos ficticios de bebé, gaming y hogar). Palabras que encuentran algo: pañales, toallitas, cochecito, biberones, auriculares, teclado, freidora, robot aspirador…' : 'Sin acceso a la API, usa «Alta manual»: se publica sin precio (SPEC §14.1).'"
           >
             <USelect v-model="state.provider" :items="providerItems" class="w-full" />
           </UFormField>

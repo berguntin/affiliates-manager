@@ -5,5 +5,6 @@ import { withRun } from '../../services/runs'
 export default defineEventHandler(async () => {
   const db = useDb()
   const { status, runId } = await withRun(db, 'tick', 'manual', null, (log) => tick(db, log, queueContext()))
-  return { status, runId }
+  const run = await db.query.runs.findFirst({ where: (r, { eq }) => eq(r.id, runId) })
+  return { status, runId, stats: run?.stats ?? {}, errors: run?.errors ?? [] }
 })

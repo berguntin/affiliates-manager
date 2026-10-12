@@ -8,5 +8,6 @@ export default defineEventHandler(async () => {
   const { status, runId } = await withRun(db, 'scan', 'manual', null, (log) =>
     scanAllThemes(db, log, { timezone: useTimezone(), copywriter: createCopywriter(useEnv()) }),
   )
-  return { status, runId }
+  const run = await db.query.runs.findFirst({ where: (r, { eq }) => eq(r.id, runId) })
+  return { status, runId, stats: run?.stats ?? {}, errors: run?.errors ?? [] }
 })

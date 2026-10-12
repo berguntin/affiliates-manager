@@ -2,12 +2,26 @@
 const { data: runs, refresh, status } = await useFetch('/api/runs', { default: () => [] })
 const { run, pending } = useApiAction()
 
+const toast = useToast()
+
 async function trigger(kind: 'scan' | 'tick') {
-  const result = await run(
-    () => apiFetch(`/api/runs/${kind}`, { method: 'POST' }),
-    kind === 'scan' ? 'Escaneo completado' : 'Cola procesada',
+  const result = await run(() =>
+    apiFetch<{ status: string; stats: Record<string, number>; errors: string[] }>(`/api/runs/${kind}`, {
+      method: 'POST',
+    }),
   )
-  if (result) await refresh()
+  if (!result) return
+  const created = result.stats.candidatas ?? 0
+  toast.add({
+    title:
+      kind === 'scan'
+        ? `Escaneo terminado: ${created} candidata${created === 1 ? '' : 's'} nueva${created === 1 ? '' : 's'}`
+        : 'Cola procesada',
+    description: result.errors.join(' · ') || undefined,
+    color: result.status === 'ok' ? 'success' : 'warning',
+    actions: kind === 'scan' && created ? [{ label: 'Ver cola', to: '/cola' }] : undefined,
+  })
+  await refresh()
 }
 </script>
 
