@@ -13,6 +13,7 @@ export const LEGAL = {
 
 /** Variables disponibles en las plantillas. */
 export const TEMPLATE_VARIABLES = [
+  'entradilla',
   'titulo',
   'marca',
   'nota',
@@ -35,6 +36,8 @@ export interface MessageData {
   title: string
   brand: string | null
   note: string | null
+  /** Entradilla redactada por IA y ya validada (ver intro.ts). null = solo plantilla. */
+  intro?: string | null
   link: string
   /** null = se publica sin precio (alta manual). */
   price: {
@@ -125,6 +128,7 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
       ? data.price.savingBasisCents
       : null
   const values: TemplateValues = {
+    entradilla: data.intro || null,
     titulo: truncate(data.title, TITLE_MAX),
     marca: data.brand,
     nota: data.note,
@@ -139,6 +143,10 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
   // El bloque de precio ya viene formateado: se inserta tras renderizar.
   const PLACEHOLDER = '\u0000PRECIO\u0000'
   let body = renderTemplate(template, { ...values, bloque_precio: PLACEHOLDER }, rules.escape)
+  // Plantillas guardadas antes de existir {{entradilla}}: va al principio.
+  if (data.intro && !/\{\{[#^]?entradilla\}\}/.test(template)) {
+    body = `${rules.escape(data.intro)}\n\n${body}`
+  }
   body = body.includes(PLACEHOLDER) ? body.replace(PLACEHOLDER, block) : `${body.trimEnd()}\n\n${block}`
 
   const escapedLink = rules.escape(data.link)

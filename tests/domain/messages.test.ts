@@ -102,6 +102,18 @@ describe('renderMessage', () => {
     expect(warnings).toContain('La plantilla no incluye {{enlace}}: se ha añadido al final')
   })
 
+  it('pone la entradilla escapada antes de la ficha y la omite si no hay', () => {
+    const intro = { ...withPrice, intro: '¡Atentos <familias>!' }
+    const { text } = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], intro)
+    expect(text.startsWith('¡Atentos &lt;familias&gt;!\n\n🛍️ <b>')).toBe(true)
+    expect(renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice).text.startsWith('🛍️')).toBe(true)
+  })
+
+  it('añade la entradilla al principio en plantillas que no la incluyen', () => {
+    const { text } = renderMessage('whatsapp', '{{titulo}} {{enlace}}', { ...withPrice, intro: '¡Mirad esto!' })
+    expect(text.startsWith('¡Mirad esto!\n\nPañales')).toBe(true)
+  })
+
   it('trunca títulos largos sin reescribirlos', () => {
     const long = { ...manual, title: 'Palabra '.repeat(40) }
     const { text } = renderMessage('whatsapp', '{{titulo}} {{enlace}}', long)
