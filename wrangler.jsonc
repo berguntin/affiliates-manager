@@ -16,7 +16,7 @@
       "binding": "DB",
       "database_name": "affiliates-manager",
       // Sustituir por el id que devuelve `wrangler d1 create affiliates-manager`
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "3c0d496d-10de-45ea-b538-e34898634161",
       "migrations_dir": "server/db/migrations"
     }
   ],
