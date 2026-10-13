@@ -94,3 +94,10 @@ export const manualProductInputSchema = z.object({
 })
 
 export type ManualProductInput = z.input<typeof manualProductInputSchema>
+
+/** Petición de «Redactar con IA» en el alta manual: la IA solo amplía las notas. */
+export const describeInputSchema = z.object({
+  title: z.string().trim().min(3, 'Indica el título').max(300),
+  brand: z.string().trim().max(100).nullable().default(null),
+  notes: z.string().trim().min(3, 'Escribe unas notas').max(500),
+})

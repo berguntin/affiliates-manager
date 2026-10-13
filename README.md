@@ -40,7 +40,7 @@ pnpm dev                              # http://localhost:3000
 Primeros pasos en el panel:
 1. **Canales → Nuevo**: crea un canal de Telegram o WhatsApp con su tracking ID.
 2. **Temáticas → Nueva**: elige «Simulado (desarrollo)» o «Alta manual» y asígnale canales.
-3. **Resumen → Escanear ahora**, o, en una temática manual, **Añadir y crear candidata**.
+3. **Resumen → Escanear ahora**, o, en una temática manual, **Añadir y crear candidata**. Si escribes unas notas en «Texto propio», **Redactar con IA** las convierte en un texto con el tono de la temática.
 4. **Cola**: revisa, edita, aprueba, programa o publica.
 
 ### Comandos
@@ -76,7 +76,7 @@ Las ejecuciones aparecen en **Más → Ejecuciones**, que también permite lanza
 | `AUTH_AUDIENCE` | secreto | *Application Audience (AUD) Tag* de la aplicación de Access |
 | `AUTH_ALLOWED_EMAILS` | secreto | Emails autorizados, separados por comas |
 | `TELEGRAM_BOT_TOKEN` | secreto | Token del bot de Telegram |
-| `ANTHROPIC_API_KEY` | secreto | Opcional. Activa la entradilla redactada por IA (SPEC §14.6); sin ella, solo plantilla |
+| `ANTHROPIC_API_KEY` | secreto | Opcional. Activa la entradilla redactada por IA (SPEC §14.6) y el botón «Redactar con IA» del alta manual (§14.9); sin ella, solo plantilla |
 | `AUTH_DISABLED` | solo local | `true` desactiva la autenticación. **Solo se respeta en `nuxt dev`** |
 
 En local van en `.dev.vars` (ignorado por git). En producción se configuran con `wrangler secret put NOMBRE`. **Nunca se guardan secretos en el repositorio.**

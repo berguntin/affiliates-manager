@@ -176,6 +176,7 @@ candidata/aprobada/programada ──(expires_at)──► caducada
   - Siempre: el aviso de afiliado literal.
 - El título se **trunca** (nunca se reescribe) a una longitud configurable. Se valida la longitud total frente a los límites de cada plataforma.
 - **Entradilla con IA** (`domain/messages/intro.ts` + `services/copywriter.ts`, SPEC §14.6): variable `{{entradilla}}`; si la plantilla no la incluye, va al principio. Se genera una por oferta al escanear (máx. 20 por ejecución, 4 en paralelo), se valida y se guarda en `deals.intro`. Los fallos de la API se agrupan en el registro de la ejecución y el mensaje sale solo con la plantilla.
+- **Texto propio con IA** (`domain/messages/description.ts` + `writeDescription` en `services/copywriter.ts`, SPEC §14.9): `POST /api/themes/:id/describe` con `{title, brand, notes}` devuelve `{text}` sin guardar nada. El panel lo pone en «Texto propio» (con «Deshacer») para revisarlo antes del alta.
 
 ## 7. Seguridad
 

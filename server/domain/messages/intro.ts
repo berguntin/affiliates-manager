@@ -47,7 +47,7 @@ export function buildIntroUserMessage(input: IntroInput): string {
 }
 
 /** Afirmaciones de precio o promesas que no podemos sostener (sobre el texto normalizado). */
-const FORBIDDEN: { pattern: RegExp; label: string }[] = [
+export const FORBIDDEN: { pattern: RegExp; label: string }[] = [
   { pattern: /\bprecios?\b/, label: 'precio' },
   { pattern: /\bdescuentos?\b/, label: 'descuento' },
   { pattern: /\brebaj(a|as|ado|ada|ados|adas)\b/, label: 'rebaja' },
@@ -85,12 +85,17 @@ export function validateIntro(raw: string, input: Pick<IntroInput, 'title' | 'br
   return { ok: true, intro }
 }
 
-/** Considera repetición cualquier tramo de 4 palabras seguidas del título. */
-function repeatsTitle(intro: string, title: string): boolean {
+/**
+ * Considera repetición cualquier tramo de 4 palabras seguidas del título (textos ya
+ * normalizados), salvo los que también estén en `allowed` (lo que escribió el usuario).
+ */
+export function repeatsTitle(intro: string, title: string, allowed = ''): boolean {
   const words = title.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
   const introWords = ` ${intro.split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ')} `
+  const allowedWords = ` ${allowed.split(/[^\p{L}\p{N}]+/u).filter(Boolean).join(' ')} `
   for (let i = 0; i + 4 <= words.length; i++) {
-    if (introWords.includes(` ${words.slice(i, i + 4).join(' ')} `)) return true
+    const run = ` ${words.slice(i, i + 4).join(' ')} `
+    if (introWords.includes(run) && !allowedWords.includes(run)) return true
   }
   return false
 }

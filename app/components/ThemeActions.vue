@@ -42,6 +42,29 @@ const { data: recent, refresh: refreshRecent } = await useFetch<
   { id: string; asin: string; title: string; createdAt: number; consumedAt: number | null }[]
 >(`/api/themes/${props.themeId}/manual-products`, { default: () => [] })
 
+// «Redactar con IA»: la IA amplía las notas; el original se guarda para poder deshacer.
+const { run: runDescribe, pending: describing } = useApiAction()
+const notesBeforeAi = ref<string | null>(null)
+const canDescribe = computed(() => manual.title.trim().length >= 3 && manual.note.trim().length >= 3)
+
+async function describeWithAi() {
+  const result = await runDescribe(() =>
+    apiFetch<{ text: string }>(`/api/themes/${props.themeId}/describe`, {
+      method: 'POST',
+      body: { title: manual.title, brand: manual.brand.trim() || null, notes: manual.note },
+    }),
+  )
+  if (!result) return
+  notesBeforeAi.value = manual.note
+  manual.note = result.text
+}
+
+function undoAi() {
+  if (notesBeforeAi.value === null) return
+  manual.note = notesBeforeAi.value
+  notesBeforeAi.value = null
+}
+
 async function addManual() {
   const result = await run(() =>
     apiFetch<{ asin: string; created: number; errors: string[] }>(`/api/themes/${props.themeId}/manual-products`, {
@@ -63,6 +86,7 @@ async function addManual() {
     actions: result.created ? [{ label: 'Ver cola', to: '/cola' }] : undefined,
   })
   Object.assign(manual, { asinOrUrl: '', title: '', brand: '', note: '', priceCents: null })
+  notesBeforeAi.value = null
   await refreshRecent()
 }
 </script>
@@ -104,9 +128,34 @@ async function addManual() {
             <EuroInput v-model="manual.priceCents" placeholder="Opcional" />
           </UFormField>
         </div>
-        <UFormField label="Texto propio" help="Por qué lo recomiendas. Aparece en el mensaje.">
-          <UTextarea v-model="manual.note" :rows="2" class="w-full" />
+        <UFormField
+          label="Texto propio"
+          help="Por qué lo recomiendas. Aparece en el mensaje. Escribe unas notas rápidas y la IA las convierte en un texto con el tono de la temática; revísalo antes de crear la candidata."
+        >
+          <UTextarea v-model="manual.note" :rows="4" :maxlength="500" autoresize class="w-full" />
         </UFormField>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton
+            label="Redactar con IA"
+            icon="i-lucide-sparkles"
+            color="neutral"
+            variant="soft"
+            size="sm"
+            :disabled="!canDescribe"
+            :loading="describing"
+            @click="describeWithAi"
+          />
+          <UButton
+            v-if="notesBeforeAi !== null"
+            label="Deshacer"
+            icon="i-lucide-undo-2"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            @click="undoAi"
+          />
+          <span v-if="!canDescribe" class="text-xs text-muted">Necesita título y notas.</span>
+        </div>
         <UButton type="submit" label="Añadir y crear candidata" icon="i-lucide-plus" block :loading="pending" />
       </form>
       <div v-if="recent.length" class="mt-4 space-y-1">

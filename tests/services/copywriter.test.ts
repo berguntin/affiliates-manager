@@ -30,3 +30,13 @@ describe('redacción de entradillas', () => {
     expect(peak).toBeLessThanOrEqual(4)
   })
 })
+
+describe('texto propio con IA', () => {
+  it('sin ANTHROPIC_API_KEY explica qué falta', async () => {
+    const { writeDescription } = await import('../../server/services/copywriter')
+    expect(await writeDescription({}, { ...input, notes: 'me encanta' })).toEqual({
+      ok: false,
+      reason: 'Falta configurar ANTHROPIC_API_KEY',
+    })
+  })
+})
