@@ -146,6 +146,7 @@ describe('ManualProvider', () => {
     const evaluation = evaluateDeal(withBasis!, { minDiscountPct: 50, minPriceCents: null, maxPriceCents: null, excludeKeywords: [], excludeBrands: [] })
     expect(evaluation.eligible).toBe(true)
     expect(evaluation.effectiveDiscountPct).toBe(25)
+    expect(evaluation.reliability).toBe('list')
     expect(evaluation.notes).toContain('Descuento introducido a mano: −25% sobre el PVP recomendado')
     // Un «precio anterior» menor que el actual no es un descuento: se ignora.
     expect(lowerBasis!.offer).toMatchObject({ savingBasisCents: null, savingBasisType: null })

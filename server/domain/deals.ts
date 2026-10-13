@@ -106,7 +106,10 @@ export function evaluateDeal(
           : `Descuento introducido a mano: −${manualPct}% sobre el precio anterior`,
       )
     }
-    return result('none', manualPct, false)
+    // La referencia la indica quien da de alta (copiada de Amazon): se rotula igual que la de la API.
+    const manualReliability: DealReliability =
+      manualPct == null ? 'none' : offer?.savingBasisType === 'LIST_PRICE' ? 'list' : 'reference'
+    return result(manualReliability, manualPct, false)
   }
   if (!offer) {
     rejections.push('Sin oferta disponible')

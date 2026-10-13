@@ -36,7 +36,8 @@ export type ManualBasisType = (typeof MANUAL_BASIS_TYPES)[number]
  * - `reference`: calculado sobre un precio anterior real (WAS_PRICE / LOWEST_PRICE…).
  * - `history`: calculado con histórico externo (Keepa).
  * - `list`: calculado sobre el PVP recomendado (propenso a inflarse).
- * - `none`: sin precio o sin referencia (p. ej. alta manual).
+ * - `none`: sin precio o sin referencia (p. ej. alta manual sin precio anterior).
+ * En las altas manuales, `reference` o `list` según el tipo de precio anterior indicado.
  */
 export type DealReliability = 'reference' | 'history' | 'list' | 'none'
 
