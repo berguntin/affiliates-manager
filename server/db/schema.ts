@@ -64,8 +64,8 @@ export const channels = sqliteTable('channels', {
   identifier: text('identifier').notNull(),
   trackingId: text('tracking_id').notNull(),
   /**
-   * Página con los avisos legales completos (p. ej. el mensaje fijado del canal). Si existe,
-   * los mensajes llevan una línea breve enlazada en lugar de los dos párrafos legales.
+   * Opcional: la línea «Enlace de afiliado…» de cada mensaje enlaza aquí (p. ej. el
+   * mensaje fijado del canal con los textos completos).
    */
   legalUrl: text('legal_url'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),

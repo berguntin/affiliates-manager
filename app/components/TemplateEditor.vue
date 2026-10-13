@@ -71,7 +71,7 @@ const channelType = computed(() => (props.format === 'telegram-html' ? 'telegram
   <div class="space-y-3">
     <p class="text-xs text-muted">
       Variables: <code v-for="tag in variableTags" :key="tag" class="mr-1" v-text="tag" />. Secciones:
-      <code v-text="sectionExample" />. El precio con fecha y hora y los avisos legales se añaden siempre.
+      <code v-text="sectionExample" />. El precio con fecha y hora y la línea «ℹ️ Enlace de afiliado» se añaden siempre.
       <code v-text="'{{entradilla}}'" /> es la frase redactada por IA; si la plantilla no la incluye, va al principio.
       <template v-if="format === 'telegram-html'">Formato HTML de Telegram: &lt;b&gt;, &lt;i&gt;.</template>
       <template v-else>Formato de WhatsApp: *negrita*, _cursiva_.</template>
@@ -94,12 +94,8 @@ const channelType = computed(() => (props.format === 'telegram-html' ? 'telegram
       <!-- eslint-disable-next-line vue/no-v-html -- HTML saneado en messageToHtml -->
       <div class="whitespace-pre-wrap break-words rounded-md bg-elevated/50 p-3 text-sm" v-html="messageToHtml(preview.text, channelType)" />
       <p class="text-xs text-muted">
-        <template v-if="preview.legalChannel">
-          Avisos legales en una línea, enlazados al aviso del canal «{{ preview.legalChannel }}». Los añade el sistema, no la plantilla.
-        </template>
-        <template v-else>
-          Avisos legales completos: los añade el sistema, no la plantilla. Para acortarlos, rellena «Enlace al aviso legal» en el canal.
-        </template>
+        La línea «ℹ️ Enlace de afiliado» la añade el sistema, no la plantilla.
+        <template v-if="preview.legalChannel"> Enlaza al aviso del canal «{{ preview.legalChannel }}».</template>
       </p>
     </div>
   </div>

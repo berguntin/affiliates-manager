@@ -15,7 +15,7 @@ Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, p
 1. **Detecta ofertas** por temática (palabras clave, categorías, exclusiones y filtros de precio, valoración y descuento mínimo).
    - Descarta descuentos poco fiables, como los calculados sobre un PVP recomendado inflado.
    - Evita repetir el mismo producto dentro de una ventana de días.
-2. **Prepara el mensaje** de cada canal con su propio tracking ID, plantillas por formato (HTML de Telegram o texto de WhatsApp) y los avisos legales obligatorios.
+2. **Prepara el mensaje** de cada canal con su propio tracking ID, plantillas por formato (HTML de Telegram o texto de WhatsApp) y la línea de avisos («ℹ️ Enlace de afiliado · precio sujeto a cambios»; los textos legales completos van en la descripción del canal).
    - Una **entradilla redactada con IA** (Claude) en el tono de la temática.
    - Un **texto propio** que la IA amplía a partir de unas notas.
 3. **Gestiona una cola** de candidatas: revisar, editar, aprobar, programar en el siguiente ciclo del cron, publicar o descartar. Las candidatas caducan a las 24 h.
@@ -55,7 +55,7 @@ Más detalle en [`docs/arquitectura.md`](docs/arquitectura.md).
 - **Cumplimiento de las normas de Afiliados como requisito de diseño.** Antes de escribir código se analizaron la Licencia y las Políticas de Amazon ([`docs/creators-api.md`](docs/creators-api.md)). De ahí salen varias reglas:
   - sin scraping;
   - sin almacenar imágenes (la vista previa la genera cada red a partir del enlace);
-  - precio siempre con fecha y hora de consulta y descargo legal;
+  - precio siempre con fecha y hora de consulta, e identificación de cada publicación como enlace de afiliado;
   - purga de los datos de producto a las 24 h;
   - un tracking ID por canal.
 
@@ -249,8 +249,8 @@ WhatsApp genera la vista previa a partir del enlace.
 ### Amazon Afiliados
 
 - Crea un **tracking ID distinto por canal** en Associates Central y da de alta cada canal como «Sitio».
-- Los mensajes incluyen siempre el aviso de afiliado. Si llevan precio, incluyen también la fecha y hora de consulta y el descargo exigido por la Licencia (ver `docs/creators-api.md` §7).
-- Para mensajes más cortos, pon los avisos completos en un mensaje fijado del canal y pega su enlace en **Canales → Enlace al aviso legal**. Cada oferta llevará solo «ℹ️ Enlace de afiliado · precio sujeto a cambios», enlazado a ese mensaje (SPEC §14.10).
+- **Pon en la descripción de cada canal los dos textos completos de Amazon**: el aviso de afiliado («En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.») y el descargo de precios (ver `docs/creators-api.md` §7). Los mensajes no los repiten (SPEC §14.10).
+- Cada mensaje acaba con «ℹ️ Enlace de afiliado · precio sujeto a cambios». Si llevan precio, incluyen también la fecha y hora de consulta. Opcional: en **Canales → Enlace para la línea de avisos** puedes enlazar esa línea a un mensaje fijado.
 
 ## Estructura
 

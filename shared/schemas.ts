@@ -69,7 +69,7 @@ export const channelInputSchema = z
     name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(80),
     identifier: z.string().trim().min(1, 'Obligatorio').max(200),
     trackingId: trackingIdSchema,
-    /** Enlace a los avisos legales completos (mensaje fijado, descripción…). Vacío = avisos completos en cada mensaje. */
+    /** Opcional: la línea «Enlace de afiliado…» de cada mensaje enlaza aquí (p. ej. el mensaje fijado). */
     legalUrl: z.preprocess(
       (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
       z

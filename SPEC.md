@@ -91,10 +91,10 @@ Interfaz abstracta con al menos tres implementaciones:
   - Telegram: HTML o MarkdownV2.
   - WhatsApp: formato propio (`*negrita*`, `_cursiva_`).
 - **Redacción con LLM (Anthropic API)** opcional, siguiendo el tono de la temática, con **fallback a plantilla** si la llamada falla. El LLM solo redacta la entradilla (§14.6).
-- **Todo mensaje incluye obligatoriamente** ⚠️ (§13.A.1; ver `docs/creators-api.md` §7.5):
-  - Precio y **fecha y hora de consulta**.
-  - Advertencia de que **el precio puede cambiar**. Según la Licencia, el texto exigido es: *"Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra."* (puede ir enlazado).
-  - El aviso literal: *"En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables."*
+- **Todo mensaje incluye obligatoriamente** ⚠️ (§13.A.1 y §14.10; ver `docs/creators-api.md` §7.5):
+  - Si lleva precio: el precio con la **fecha y hora de consulta**.
+  - La línea breve **«ℹ️ Enlace de afiliado · precio sujeto a cambios»** (sin precio, solo «ℹ️ Enlace de afiliado»).
+  - Los textos completos de Amazon (aviso de afiliado y descargo de precios) van en la **descripción del canal**, no en cada mensaje (§14.10).
 - **Enlace de afiliado** ⚠️ §13.A.4: **tracking ID distinto por canal**, para medir en el panel de Afiliados qué canal convierte.
   - 🚫 Sin redirecciones propias que oculten el enlace de Amazon.
 
@@ -242,7 +242,7 @@ Revisado con la documentación oficial de la Creators API y las **Políticas y e
 
 ## 14. Decisiones tomadas
 
-1. **Publicar sin API en la fase 1** (resuelve 13.A.1). Los productos dados de alta con `ManualProvider` se publican **sin precio**, con el texto "Consulta el precio actual en Amazon". El precio que se introduzca a mano es solo una nota interna y nunca aparece en un mensaje (modificado temporalmente por §14.7). Los mensajes con precio (procedentes de la API, o del mock en desarrollo) incluyen la fecha y hora de consulta y el descargo de la Licencia.
+1. **Publicar sin API en la fase 1** (resuelve 13.A.1). Los productos dados de alta con `ManualProvider` se publican **sin precio**, con el texto "Consulta el precio actual en Amazon". El precio que se introduzca a mano es solo una nota interna y nunca aparece en un mensaje (modificado temporalmente por §14.7). Los mensajes con precio (procedentes de la API, o del mock en desarrollo) incluyen la fecha y hora de consulta y la línea breve de avisos (§14.10).
 2. **Detección de ofertas con los datos de Amazon** (resuelve 13.A.2). Se usan `savingBasisType` y `savings` de OffersV2, junto con las señales de §13.A.2. **No se mantiene un histórico propio de precios**: las instantáneas caducan a las 24 h y se purgan. Keepa queda como fuente opcional detrás de la interfaz `PriceHistoryProvider` (sin implementar). **No se pedirá autorización escrita a Afiliados**: el proyecto es un MVP para validar la idea.
 3. **Sin almacenamiento de imágenes** (resuelve 13.A.3). Los mensajes llevan el enlace de Amazon y la vista previa la genera cada plataforma. En Telegram se usa `sendMessage` con `link_preview_options` y un botón al producto. En WhatsApp se comparte solo texto. No se usa R2.
 4. **Nuxt 4 en lugar de Nuxt 3.** Nuxt 4 es la versión mayor actual: misma API y mismo Nitro, con la estructura `app/`. Nuxt 3 solo recibe mantenimiento. Para un proyecto nuevo, Nuxt 4 da más vida útil sin coste de aprendizaje.
@@ -254,16 +254,15 @@ Revisado con la documentación oficial de la Creators API y las **Políticas y e
    - **no forma parte** de una posible versión para terceros (§12, Fase 3).
 
    Salvaguardas:
-   - el mensaje muestra la fecha y hora del alta como hora de consulta, y el descargo de que el precio puede cambiar;
+   - el mensaje muestra la fecha y hora del alta como hora de consulta, y «precio sujeto a cambios»;
    - sin precio, el mensaje sale con «Consulta el precio actual en Amazon».
 
    **Ampliación (2026-10-13):** también se puede indicar el precio de referencia que muestra Amazon (precio anterior tachado o PVP recomendado) para calcular y publicar el descuento («−25% (antes …)» o «(PVP rec. …)»). Tiene el mismo carácter temporal y solo se usa si es mayor que el precio actual. Los filtros de descuento mínimo no se aplican a las altas manuales.
 8. **Bot buzón de Telegram.** Un bot aparte (no el que publica) recibe enlaces compartidos desde la app de Amazon por las personas autorizadas, crea la candidata con entradilla de IA y permite publicar, programar o descartar desde el chat. Nunca accede a las páginas de Amazon: solo resuelve redirecciones de enlaces cortos para obtener el ASIN.
 9. **Texto propio redactado con IA (alta manual).** En el alta manual del panel, el botón «Redactar con IA» convierte las **notas del usuario** (por qué lo recomienda, para quién es) en un texto de 2 a 4 frases (≤ 480 caracteres) en el tono de la temática. El texto rellena «Texto propio» y se revisa antes de crear la candidata. La IA **solo amplía lo que dicen las notas**: no describe el producto por su cuenta, no usa contenido de Amazon (la Licencia prohíbe modificarlo o reescribirlo) y no inventa características. Se valida igual que la entradilla, con una diferencia: se aceptan las cifras y expresiones que ya estén en las notas. **Pendiente para cuando haya Creators API:** generarlo de forma automática. Aun así, seguirá sin poder parafrasear las características que devuelva la API, por la misma restricción de la Licencia.
-10. **Avisos legales en versión breve (2026-10-13).** Cada canal puede tener un «Enlace al aviso legal» (p. ej. el mensaje fijado del canal de Telegram) con los dos textos completos: el aviso de afiliado y el descargo de precios. Si lo tiene, cada mensaje lleva una sola línea enlazada en lugar de los dos párrafos: «ℹ️ Enlace de afiliado · precio sujeto a cambios». Fundamento:
-    - la Licencia (2.c.i) admite el descargo de precios «literal o enlazado»;
-    - el aviso literal de afiliado está en el canal (descripción y mensaje fijado);
-    - la marca «Enlace de afiliado» en cada mensaje lo identifica como comunicación comercial (LSSI, art. 20).
+10. **Avisos legales en la descripción del canal (2026-10-13, con asesoramiento legal).** Por decisión del propietario, tras consultar con un abogado, los textos completos de Amazon (el aviso de afiliado y el descargo de precios) van en la **descripción de cada canal**, y no se repiten en los mensajes. Cada mensaje lleva solo:
+    - la fecha y hora de consulta junto al precio;
+    - la línea breve «ℹ️ Enlace de afiliado · precio sujeto a cambios» (sin precio, «ℹ️ Enlace de afiliado»). Identifica cada publicación como comunicación comercial.
 
-    La fecha y hora de consulta siguen junto al precio. Sin el enlace, los mensajes llevan los textos completos. Al editar un mensaje a mano, el texto debe conservar los textos completos o la línea breve con el enlace del canal. **No se eliminan del todo**: un mensaje sin ninguna identificación no cumpliría ni la Licencia ni la LSSI.
+    Si el canal tiene «Enlace para la línea de avisos» (p. ej. el mensaje fijado con los textos completos), la línea enlaza a él. La migración `0005` pasa los mensajes aún no publicados al formato breve. Al editar un mensaje a mano, debe conservar la línea breve. **Requisito operativo:** cada canal debe tener los textos completos en su descripción.
 

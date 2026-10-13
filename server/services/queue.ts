@@ -79,7 +79,6 @@ const queueColumns = {
   channelId: channels.id,
   channelName: channels.name,
   channelType: channels.type,
-  channelLegalUrl: channels.legalUrl,
 }
 
 function baseQuery(db: Db) {
@@ -155,7 +154,7 @@ export async function applyAction(
     case 'edit': {
       const text = payload.text?.trim()
       if (!text) throw new QueueError('El texto no puede estar vacío', 400)
-      const missing = checkRequiredElements(text, { link: item.link, withPrice: item.priceCentsShown != null, legalUrl: item.channelLegalUrl })
+      const missing = checkRequiredElements(text, { link: item.link, withPrice: item.priceCentsShown != null })
       if (missing.length) throw new QueueError(`Al texto le falta: ${missing.join(', ')}`, 400)
       await setStatus(db, id, to, { text })
       break
@@ -322,7 +321,7 @@ export async function publish(db: Db, id: string, ctx: QueueContext) {
     item = result.item
   }
 
-  const missing = checkRequiredElements(item.text, { link: item.link, withPrice: item.priceCentsShown != null, legalUrl: item.channelLegalUrl })
+  const missing = checkRequiredElements(item.text, { link: item.link, withPrice: item.priceCentsShown != null })
   if (missing.length) throw new QueueError(`Al texto le falta: ${missing.join(', ')}`, 400)
 
   let externalId: string | null = null

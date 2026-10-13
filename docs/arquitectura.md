@@ -39,7 +39,7 @@ server/
 │  ├─ publication.ts   máquina de estados de la cola
 │  ├─ schedule.ts      franjas horarias, límite diario, siguiente hueco libre
 │  ├─ affiliate.ts     construcción y validación de enlaces de afiliado
-│  └─ messages/        motor de plantillas, formatos Telegram/WhatsApp, avisos legales, entradilla IA
+│  └─ messages/        motor de plantillas, formatos Telegram/WhatsApp, línea de avisos, entradilla IA
 ├─ providers/      ProductProvider + implementaciones (manual, mock; creators-api en fase 2)
 │  └─ history/       PriceHistoryProvider (null; Keepa en el futuro)
 ├─ channels/       ChannelAdapter + telegram (automático) y whatsapp (asistido)
@@ -170,10 +170,11 @@ candidata/aprobada/programada ──(expires_at)──► caducada
 ## 6. Mensajes
 
 - Motor mínimo de plantillas: `{{variable}}` y bloques `{{#precio}}…{{/precio}}` / `{{^precio}}…{{/precio}}`. **El escapado depende del formato**: HTML de Telegram (`&`, `<`, `>`) o texto de WhatsApp.
-- Los **bloques legales no forman parte de la plantilla editable**: el renderizador los añade siempre, así que no se pueden borrar por error.
-  - Con precio: `Precio: 19,99 € (consultado el 12/10/2026 a las 14:11, hora peninsular)` + el descargo literal de la Licencia.
+- El **bloque de precio y la línea de avisos no forman parte de la plantilla editable**: el renderizador los añade siempre, así que no se pueden borrar por error (SPEC §14.10).
+  - Con precio: `Precio: 19,99 € (consultado el 12/10/2026 a las 14:11, hora peninsular)`.
   - Sin precio: `Consulta el precio actual en Amazon`.
-  - Siempre: el aviso de afiliado literal.
+  - Siempre, al final: `ℹ️ Enlace de afiliado · precio sujeto a cambios` (sin precio, `ℹ️ Enlace de afiliado`). Si el canal tiene `legal_url`, la línea enlaza a esa página.
+  - Los textos completos de Amazon van en la descripción de cada canal.
 - El título se **trunca** (nunca se reescribe) a una longitud configurable. Se valida la longitud total frente a los límites de cada plataforma.
 - **Entradilla con IA** (`domain/messages/intro.ts` + `services/copywriter.ts`, SPEC §14.6): variable `{{entradilla}}`; si la plantilla no la incluye, va al principio. Se genera una por oferta al escanear (máx. 20 por ejecución, 4 en paralelo), se valida y se guarda en `deals.intro`. Los fallos de la API se agrupan en el registro de la ejecución y el mensaje sale solo con la plantilla.
 - **Texto propio con IA** (`domain/messages/description.ts` + `writeDescription` en `services/copywriter.ts`, SPEC §14.9): `POST /api/themes/:id/describe` con `{title, brand, notes}` devuelve `{text}` sin guardar nada. El panel lo pone en «Texto propio» (con «Deshacer») para revisarlo antes del alta.

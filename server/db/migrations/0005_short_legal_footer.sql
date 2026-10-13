@@ -1,0 +1,9 @@
+-- Pasa los mensajes aún no publicados a la línea breve de avisos (SPEC §14.10).
+-- Los ya publicados no se tocan: son el registro de lo que salió.
+UPDATE `publications` SET `text` = replace(`text`, '<i>Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra.</i>' || char(10) || char(10) || '<i>En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.</i>', 'ℹ️ Enlace de afiliado · precio sujeto a cambios') WHERE `status` IN ('candidata', 'aprobada', 'programada');
+--> statement-breakpoint
+UPDATE `publications` SET `text` = replace(`text`, '<i>En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.</i>', 'ℹ️ Enlace de afiliado') WHERE `status` IN ('candidata', 'aprobada', 'programada');
+--> statement-breakpoint
+UPDATE `publications` SET `text` = replace(`text`, '_Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra._' || char(10) || char(10) || '_En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables._', 'ℹ️ Enlace de afiliado · precio sujeto a cambios') WHERE `status` IN ('candidata', 'aprobada', 'programada');
+--> statement-breakpoint
+UPDATE `publications` SET `text` = replace(`text`, '_En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables._', 'ℹ️ Enlace de afiliado') WHERE `status` IN ('candidata', 'aprobada', 'programada');

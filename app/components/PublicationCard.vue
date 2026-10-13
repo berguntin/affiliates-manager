@@ -301,8 +301,8 @@ async function markPublished() {
       <template #body>
         <UTextarea v-model="draft" :rows="16" autoresize class="w-full font-mono text-sm" />
         <p class="mt-2 text-xs text-muted">
-          Deben mantenerse el enlace, el aviso de afiliado y, si hay precio, la fecha y hora de consulta y el aviso
-          de que el precio puede cambiar.
+          Deben mantenerse el enlace, «Enlace de afiliado» y, si hay precio, la fecha y hora de consulta y
+          «precio sujeto a cambios».
         </p>
       </template>
       <template #footer>

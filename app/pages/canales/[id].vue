@@ -49,11 +49,8 @@ const legalUrl = computed({
   get: () => state.legalUrl ?? '',
   set: (value: string) => (state.legalUrl = value.trim() || null),
 })
-const legalUrlHelp = computed(() =>
-  state.type === 'telegram'
-    ? 'Opcional. Enlace al mensaje fijado con los avisos completos (mantén pulsado el mensaje → Copiar enlace). Así cada oferta lleva solo una línea: «ℹ️ Enlace de afiliado · precio sujeto a cambios». Vacío: avisos completos en cada mensaje.'
-    : 'Opcional. Una página con los avisos completos (p. ej. el mensaje fijado de tu canal de Telegram). Así cada oferta lleva solo una línea con el enlace. Vacío: avisos completos en cada mensaje.',
-)
+const legalUrlHelp =
+  'Opcional. Cada oferta acaba con «ℹ️ Enlace de afiliado · precio sujeto a cambios»; si pones aquí un enlace (p. ej. el mensaje fijado con los textos completos: mantenlo pulsado → Copiar enlace), esa línea enlazará a él.'
 
 const { run, pending } = useApiAction()
 
@@ -117,7 +114,7 @@ async function remove() {
           >
             <UInput v-model="state.trackingId" class="w-full" autocapitalize="off" />
           </UFormField>
-          <UFormField label="Enlace al aviso legal" name="legalUrl" :help="legalUrlHelp">
+          <UFormField label="Enlace para la línea de avisos" name="legalUrl" :help="legalUrlHelp">
             <UInput v-model="legalUrl" placeholder="https://t.me/tu_canal/2" inputmode="url" autocapitalize="off" class="w-full" />
           </UFormField>
           <UFormField label="Temáticas" name="themeIds">

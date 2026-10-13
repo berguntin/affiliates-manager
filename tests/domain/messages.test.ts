@@ -63,7 +63,7 @@ describe('formatCheckedAt', () => {
 })
 
 describe('renderMessage', () => {
-  it('Telegram con precio: escapa HTML e incluye fecha, descargo y aviso', () => {
+  it('Telegram con precio: escapa HTML e incluye fecha y la línea breve de avisos', () => {
     const { text, warnings } = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice)
     expect(warnings).toEqual([])
     expect(text).toContain('<b>Pañales &lt;talla 3&gt; &amp; más</b>')
@@ -71,40 +71,32 @@ describe('renderMessage', () => {
     expect(text).toContain(
       `💶 Precio: <b>${eur('19,99')}</b> (consultado el 12/10/2026 a las 14:11, hora peninsular)`,
     )
-    expect(text).toContain(`<i>${LEGAL.priceDisclaimer}</i>`)
-    expect(text.endsWith(`<i>${LEGAL.affiliate}</i>`)).toBe(true)
+    expect(text.endsWith('ℹ️ Enlace de afiliado · precio sujeto a cambios')).toBe(true)
+    expect(text).not.toContain('En calidad de Afiliado')
     expect(text).toContain(link.replace(/&/g, '&amp;'))
     expect(checkRequiredElements(text, { link, withPrice: true })).toEqual([])
   })
 
-  it('WhatsApp sin precio (alta manual): sin descargo de precio y con «consulta el precio»', () => {
+  it('WhatsApp sin precio (alta manual): «consulta el precio» y solo «Enlace de afiliado»', () => {
     const { text } = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, manual)
     expect(text).toContain('🛍️ *Pañales <talla 3> & más*')
     expect(text).toContain(`💶 ${LEGAL.noPrice}`)
     expect(text).toContain('Ideal para la canastilla')
-    expect(text).not.toContain(LEGAL.priceDisclaimer)
+    expect(text).not.toContain(LEGAL.shortPrice)
     expect(text).not.toContain('🔻')
-    expect(text).toContain(`_${LEGAL.affiliate}_`)
+    expect(text.endsWith('ℹ️ Enlace de afiliado')).toBe(true)
     expect(checkRequiredElements(text, { link, withPrice: false })).toEqual([])
   })
 
-  it('con enlace al aviso legal, sustituye los dos párrafos por una línea enlazada', () => {
+  it('con enlace en el canal, la línea de avisos enlaza a él', () => {
     const legalUrl = 'https://t.me/baby_ofertas/2?a=1&b=2'
     const tg = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], { ...withPrice, legalUrl }).text
-    expect(tg).not.toContain(LEGAL.affiliate)
-    expect(tg).not.toContain(LEGAL.priceDisclaimer)
     expect(tg.endsWith('ℹ️ <a href="https://t.me/baby_ofertas/2?a=1&amp;b=2">Enlace de afiliado · precio sujeto a cambios</a>')).toBe(true)
-    expect(tg).toContain('(consultado el 12/10/2026 a las 14:11, hora peninsular)')
-    expect(checkRequiredElements(tg, { link, withPrice: true, legalUrl })).toEqual([])
-    // Sin el enlace del canal, la versión breve no basta.
-    expect(checkRequiredElements(tg, { link, withPrice: true })).toEqual([
-      'el aviso de afiliado',
-      'el aviso de que el precio puede cambiar',
-    ])
+    expect(checkRequiredElements(tg, { link, withPrice: true })).toEqual([])
 
     const wa = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, { ...manual, legalUrl }).text
     expect(wa.endsWith(`ℹ️ Enlace de afiliado: ${legalUrl}`)).toBe(true)
-    expect(checkRequiredElements(wa, { link, withPrice: false, legalUrl })).toEqual([])
+    expect(checkRequiredElements(wa, { link, withPrice: false })).toEqual([])
   })
 
   it('rotula el PVP recomendado como tal y no como «antes»', () => {
@@ -143,8 +135,8 @@ describe('renderMessage', () => {
   it('detecta textos editados sin los elementos obligatorios', () => {
     expect(checkRequiredElements('Hola', { link, withPrice: true })).toEqual([
       'el enlace del producto',
-      'el aviso de afiliado',
-      'el aviso de que el precio puede cambiar',
+      '«Enlace de afiliado»',
+      '«precio sujeto a cambios»',
       'la fecha y hora de consulta del precio',
     ])
   })

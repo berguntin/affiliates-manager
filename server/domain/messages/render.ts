@@ -2,14 +2,12 @@ import type { MessageFormat } from '../../../shared/types'
 import { truncate } from '../text'
 import { renderTemplate, validateTemplate, type TemplateValues } from './template'
 
-/** Textos exigidos por Amazon (ver docs/creators-api.md §7). No editables. */
+/**
+ * Avisos de cada mensaje (SPEC §14.10). Los textos completos de Amazon van en la
+ * descripción del canal; en el mensaje, solo esta línea breve. No editables.
+ */
 export const LEGAL = {
-  affiliate:
-    'En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.',
-  priceDisclaimer:
-    'Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra.',
   noPrice: 'Consulta el precio actual en Amazon.',
-  /** Versión breve: identifica el enlace y enlaza a los avisos completos (§14.10). */
   shortAffiliate: 'Enlace de afiliado',
   shortPrice: 'precio sujeto a cambios',
 } as const
@@ -54,7 +52,7 @@ export interface MessageData {
     checkedAt: number
   } | null
   timezone: string
-  /** Avisos legales completos fuera del mensaje (canal con «Enlace al aviso legal»). */
+  /** Opcional: la línea de avisos enlaza aquí (p. ej. el mensaje fijado del canal). */
   legalUrl?: string | null
 }
 
@@ -116,20 +114,14 @@ function priceBlock(data: MessageData, rules: FormatRules): string {
   return `💶 Precio: ${rules.bold(rules.escape(formatEuros(data.price.priceCents)))} ${rules.escape(`(consultado el ${when})`)}`
 }
 
+/** «ℹ️ Enlace de afiliado · precio sujeto a cambios», enlazado si el canal tiene enlace. */
 function legalFooter(data: MessageData, rules: FormatRules): string {
-  if (data.legalUrl) {
-    // Identificación breve en cada mensaje + descargo «enlazado» (Licencia 2.c.i).
-    const label = data.price ? `${LEGAL.shortAffiliate} · ${LEGAL.shortPrice}` : LEGAL.shortAffiliate
-    return `ℹ️ ${rules.link(rules.escape(label), data.legalUrl)}`
-  }
-  const lines = []
-  if (data.price) lines.push(rules.italic(rules.escape(LEGAL.priceDisclaimer)))
-  lines.push(rules.italic(rules.escape(LEGAL.affiliate)))
-  return lines.join('\n\n')
+  const label = rules.escape(data.price ? `${LEGAL.shortAffiliate} · ${LEGAL.shortPrice}` : LEGAL.shortAffiliate)
+  return `ℹ️ ${data.legalUrl ? rules.link(label, data.legalUrl) : label}`
 }
 
 /**
- * Renderiza un mensaje. El bloque de precio (con fecha y hora) y los avisos legales
+ * Renderiza un mensaje. El bloque de precio (con fecha y hora) y la línea de avisos
  * los añade siempre el renderizador: no dependen de la plantilla.
  */
 export function renderMessage(format: MessageFormat, template: string, data: MessageData): RenderedMessage {
@@ -177,22 +169,13 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
 }
 
 /** Comprueba que un texto (p. ej. editado a mano) mantiene los elementos obligatorios. */
-export function checkRequiredElements(
-  text: string,
-  opts: { link: string; withPrice: boolean; legalUrl?: string | null },
-): string[] {
+export function checkRequiredElements(text: string, opts: { link: string; withPrice: boolean }): string[] {
   const missing: string[] = []
   const plain = text.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/[*_]/g, '')
-  // Versión breve: vale si el mensaje conserva el enlace a los avisos completos del canal.
-  const linked = !!opts.legalUrl && text.replace(/&amp;/g, '&').includes(opts.legalUrl)
   if (!plain.includes(opts.link)) missing.push('el enlace del producto')
-  if (!plain.includes(LEGAL.affiliate) && !(linked && plain.includes(LEGAL.shortAffiliate))) {
-    missing.push('el aviso de afiliado')
-  }
+  if (!plain.includes(LEGAL.shortAffiliate)) missing.push('«Enlace de afiliado»')
   if (opts.withPrice) {
-    if (!plain.includes(LEGAL.priceDisclaimer) && !(linked && plain.includes(LEGAL.shortPrice))) {
-      missing.push('el aviso de que el precio puede cambiar')
-    }
+    if (!plain.includes(LEGAL.shortPrice)) missing.push('«precio sujeto a cambios»')
     if (!/consultado el \d{2}\/\d{2}\/\d{4} a las \d{2}:\d{2}/.test(plain)) {
       missing.push('la fecha y hora de consulta del precio')
     }

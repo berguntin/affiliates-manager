@@ -1,6 +1,6 @@
 import type { MessageFormat } from '../../../shared/types'
 
-/** Plantillas por defecto. Los avisos legales se añaden siempre aparte. */
+/** Plantillas por defecto. La línea de avisos («Enlace de afiliado…») se añade siempre aparte. */
 export const DEFAULT_TEMPLATES: Record<MessageFormat, string> = {
   'telegram-html': `{{#entradilla}}{{entradilla}}
 
