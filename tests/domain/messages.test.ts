@@ -88,6 +88,25 @@ describe('renderMessage', () => {
     expect(checkRequiredElements(text, { link, withPrice: false })).toEqual([])
   })
 
+  it('con enlace al aviso legal, sustituye los dos párrafos por una línea enlazada', () => {
+    const legalUrl = 'https://t.me/baby_ofertas/2?a=1&b=2'
+    const tg = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], { ...withPrice, legalUrl }).text
+    expect(tg).not.toContain(LEGAL.affiliate)
+    expect(tg).not.toContain(LEGAL.priceDisclaimer)
+    expect(tg.endsWith('ℹ️ <a href="https://t.me/baby_ofertas/2?a=1&amp;b=2">Enlace de afiliado · precio sujeto a cambios</a>')).toBe(true)
+    expect(tg).toContain('(consultado el 12/10/2026 a las 14:11, hora peninsular)')
+    expect(checkRequiredElements(tg, { link, withPrice: true, legalUrl })).toEqual([])
+    // Sin el enlace del canal, la versión breve no basta.
+    expect(checkRequiredElements(tg, { link, withPrice: true })).toEqual([
+      'el aviso de afiliado',
+      'el aviso de que el precio puede cambiar',
+    ])
+
+    const wa = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, { ...manual, legalUrl }).text
+    expect(wa.endsWith(`ℹ️ Enlace de afiliado: ${legalUrl}`)).toBe(true)
+    expect(checkRequiredElements(wa, { link, withPrice: false, legalUrl })).toEqual([])
+  })
+
   it('rotula el PVP recomendado como tal y no como «antes»', () => {
     const list = { ...withPrice, price: { ...withPrice.price!, basisIsListPrice: true } }
     const { text } = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, list)

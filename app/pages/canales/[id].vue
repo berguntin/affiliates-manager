@@ -13,6 +13,7 @@ const state = reactive<ChannelData>({
   name: '',
   identifier: '',
   trackingId: '',
+  legalUrl: null,
   active: true,
   themeIds: [],
 })
@@ -25,6 +26,7 @@ if (!isNew.value) {
     name: channel.name,
     identifier: channel.identifier,
     trackingId: channel.trackingId,
+    legalUrl: channel.legalUrl,
     active: channel.active,
     themeIds: channel.themeIds,
   })
@@ -41,6 +43,16 @@ const identifierHelp = computed(() =>
   state.type === 'telegram'
     ? '@nombre_del_canal o id numérico (-100…). El bot debe ser administrador del canal.'
     : 'Enlace del canal de WhatsApp (solo informativo; la publicación es manual).',
+)
+
+const legalUrl = computed({
+  get: () => state.legalUrl ?? '',
+  set: (value: string) => (state.legalUrl = value.trim() || null),
+})
+const legalUrlHelp = computed(() =>
+  state.type === 'telegram'
+    ? 'Opcional. Enlace al mensaje fijado con los avisos completos (mantén pulsado el mensaje → Copiar enlace). Así cada oferta lleva solo una línea: «ℹ️ Enlace de afiliado · precio sujeto a cambios». Vacío: avisos completos en cada mensaje.'
+    : 'Opcional. Una página con los avisos completos (p. ej. el mensaje fijado de tu canal de Telegram). Así cada oferta lleva solo una línea con el enlace. Vacío: avisos completos en cada mensaje.',
 )
 
 const { run, pending } = useApiAction()
@@ -104,6 +116,9 @@ async function remove() {
             help="Distinto por canal para medir qué canal convierte. Ej. micanal-21"
           >
             <UInput v-model="state.trackingId" class="w-full" autocapitalize="off" />
+          </UFormField>
+          <UFormField label="Enlace al aviso legal" name="legalUrl" :help="legalUrlHelp">
+            <UInput v-model="legalUrl" placeholder="https://t.me/tu_canal/2" inputmode="url" autocapitalize="off" class="w-full" />
           </UFormField>
           <UFormField label="Temáticas" name="themeIds">
             <USelectMenu

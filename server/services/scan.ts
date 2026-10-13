@@ -40,6 +40,7 @@ export function messageDataFrom(
   evaluation: Pick<DealEvaluation, 'effectiveDiscountPct' | 'reliability'>,
   timezone: string,
   intro: string | null = null,
+  legalUrl: string | null = null,
 ): MessageData {
   const offer = snapshot.offer
   return {
@@ -47,6 +48,7 @@ export function messageDataFrom(
     brand: snapshot.brand,
     note: snapshot.note || null,
     intro,
+    legalUrl,
     link: snapshot.detailPageUrl,
     timezone,
     price: offer
@@ -233,7 +235,7 @@ export async function scanTheme(
       const fresh = freshByChannel.get(channel.id)?.get(snapshot.asin)
       if (!fresh) continue
       const format = FORMAT_BY_CHANNEL[channel.type]
-      const rendered = renderMessage(format, templates.get(format)!, messageDataFrom(fresh, evaluation, options.timezone, intro))
+      const rendered = renderMessage(format, templates.get(format)!, messageDataFrom(fresh, evaluation, options.timezone, intro, channel.legalUrl))
       for (const warning of rendered.warnings) log.error(`${label} (${channel.name}): ${warning}`)
       pubs.push(
         db.insert(publications).values({

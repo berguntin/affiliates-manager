@@ -69,6 +69,17 @@ export const channelInputSchema = z
     name: z.string().trim().min(2, 'Mínimo 2 caracteres').max(80),
     identifier: z.string().trim().min(1, 'Obligatorio').max(200),
     trackingId: trackingIdSchema,
+    /** Enlace a los avisos legales completos (mensaje fijado, descripción…). Vacío = avisos completos en cada mensaje. */
+    legalUrl: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? null : v),
+      z
+        .string()
+        .trim()
+        .max(300)
+        .regex(/^https:\/\/[^\s"<>]+$/, 'Debe ser un enlace https://')
+        .nullable()
+        .default(null),
+    ),
     active: z.boolean().default(true),
     themeIds: z.array(z.string().min(1)).max(50).default([]),
   })

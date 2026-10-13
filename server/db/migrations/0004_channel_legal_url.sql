@@ -1,0 +1,1 @@
+ALTER TABLE `channels` ADD `legal_url` text;

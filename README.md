@@ -250,6 +250,7 @@ WhatsApp genera la vista previa a partir del enlace.
 
 - Crea un **tracking ID distinto por canal** en Associates Central y da de alta cada canal como «Sitio».
 - Los mensajes incluyen siempre el aviso de afiliado. Si llevan precio, incluyen también la fecha y hora de consulta y el descargo exigido por la Licencia (ver `docs/creators-api.md` §7).
+- Para mensajes más cortos, pon los avisos completos en un mensaje fijado del canal y pega su enlace en **Canales → Enlace al aviso legal**. Cada oferta llevará solo «ℹ️ Enlace de afiliado · precio sujeto a cambios», enlazado a ese mensaje (SPEC §14.10).
 
 ## Estructura
 

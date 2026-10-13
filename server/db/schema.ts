@@ -63,6 +63,11 @@ export const channels = sqliteTable('channels', {
   /** Telegram: @canal o -100…; WhatsApp: URL del canal (informativa). */
   identifier: text('identifier').notNull(),
   trackingId: text('tracking_id').notNull(),
+  /**
+   * Página con los avisos legales completos (p. ej. el mensaje fijado del canal). Si existe,
+   * los mensajes llevan una línea breve enlazada en lugar de los dos párrafos legales.
+   */
+  legalUrl: text('legal_url'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   createdAt: timestamp('created_at').notNull().default(now),
   updatedAt: timestamp('updated_at').notNull().default(now),

@@ -9,6 +9,9 @@ export const LEGAL = {
   priceDisclaimer:
     'Los precios y disponibilidad del Producto son precisos en la fecha y hora indicados y están sujetos a cambios. Se aplicará a la compra del producto el precio e información de disponibilidad que aparezca en Amazon.es en el momento de la compra.',
   noPrice: 'Consulta el precio actual en Amazon.',
+  /** Versión breve: identifica el enlace y enlaza a los avisos completos (§14.10). */
+  shortAffiliate: 'Enlace de afiliado',
+  shortPrice: 'precio sujeto a cambios',
 } as const
 
 /** Variables disponibles en las plantillas. */
@@ -51,6 +54,8 @@ export interface MessageData {
     checkedAt: number
   } | null
   timezone: string
+  /** Avisos legales completos fuera del mensaje (canal con «Enlace al aviso legal»). */
+  legalUrl?: string | null
 }
 
 export interface RenderedMessage {
@@ -64,6 +69,8 @@ interface FormatRules {
   escape: (value: string) => string
   bold: (value: string) => string
   italic: (value: string) => string
+  /** Texto enlazado; en WhatsApp no hay enlaces con texto y la URL va detrás. */
+  link: (text: string, url: string) => string
 }
 
 const RULES: Record<MessageFormat, FormatRules> = {
@@ -71,11 +78,13 @@ const RULES: Record<MessageFormat, FormatRules> = {
     escape: (v) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
     bold: (v) => `<b>${v}</b>`,
     italic: (v) => `<i>${v}</i>`,
+    link: (text, url) => `<a href="${url.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}">${text}</a>`,
   },
   whatsapp: {
     escape: (v) => v,
     bold: (v) => `*${v}*`,
     italic: (v) => `_${v}_`,
+    link: (text, url) => `${text}: ${url}`,
   },
 }
 
@@ -108,6 +117,11 @@ function priceBlock(data: MessageData, rules: FormatRules): string {
 }
 
 function legalFooter(data: MessageData, rules: FormatRules): string {
+  if (data.legalUrl) {
+    // Identificación breve en cada mensaje + descargo «enlazado» (Licencia 2.c.i).
+    const label = data.price ? `${LEGAL.shortAffiliate} · ${LEGAL.shortPrice}` : LEGAL.shortAffiliate
+    return `ℹ️ ${rules.link(rules.escape(label), data.legalUrl)}`
+  }
   const lines = []
   if (data.price) lines.push(rules.italic(rules.escape(LEGAL.priceDisclaimer)))
   lines.push(rules.italic(rules.escape(LEGAL.affiliate)))
@@ -163,13 +177,22 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
 }
 
 /** Comprueba que un texto (p. ej. editado a mano) mantiene los elementos obligatorios. */
-export function checkRequiredElements(text: string, opts: { link: string; withPrice: boolean }): string[] {
+export function checkRequiredElements(
+  text: string,
+  opts: { link: string; withPrice: boolean; legalUrl?: string | null },
+): string[] {
   const missing: string[] = []
   const plain = text.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/[*_]/g, '')
+  // Versión breve: vale si el mensaje conserva el enlace a los avisos completos del canal.
+  const linked = !!opts.legalUrl && text.replace(/&amp;/g, '&').includes(opts.legalUrl)
   if (!plain.includes(opts.link)) missing.push('el enlace del producto')
-  if (!plain.includes(LEGAL.affiliate)) missing.push('el aviso de afiliado')
+  if (!plain.includes(LEGAL.affiliate) && !(linked && plain.includes(LEGAL.shortAffiliate))) {
+    missing.push('el aviso de afiliado')
+  }
   if (opts.withPrice) {
-    if (!plain.includes(LEGAL.priceDisclaimer)) missing.push('el aviso de que el precio puede cambiar')
+    if (!plain.includes(LEGAL.priceDisclaimer) && !(linked && plain.includes(LEGAL.shortPrice))) {
+      missing.push('el aviso de que el precio puede cambiar')
+    }
     if (!/consultado el \d{2}\/\d{2}\/\d{4} a las \d{2}:\d{2}/.test(plain)) {
       missing.push('la fecha y hora de consulta del precio')
     }
