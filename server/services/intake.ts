@@ -16,12 +16,14 @@ import {
   type TelegramEntity,
 } from '../domain/intake'
 import { parseAsin } from '../domain/affiliate'
+import { withFeatureBullets } from '../domain/amazon-page'
 import { TransitionError } from '../domain/publication'
 import type { Db } from '../utils/db'
 import { schema } from '../utils/db'
 import type { AppEnv } from '../utils/env'
 import { createCopywriter } from './copywriter'
 import { addManualProduct } from './manual-products'
+import { ProductLookupError, lookupProduct, type ProductLookup } from './product-lookup'
 import { QueueError, applyAction, publish } from './queue'
 import { withRun } from './runs'
 import { scanTheme } from './scan'
@@ -213,18 +215,32 @@ export class IntakeBot {
       return
     }
 
-    const { priceCents, rest } = extractPrice(text)
+    const { priceCents: typedPrice, rest } = extractPrice(text)
+    let product: ProductLookup | null = null
+    let warning: string | null = null
+    try {
+      product = await lookupProduct(asin, { fetchFn: this.ctx.fetchFn })
+      if (product.priceCents == null && typedPrice == null) warning = 'Amazon no muestra precio; responde con él si lo sabes'
+    } catch (error) {
+      warning = error instanceof ProductLookupError ? error.message : `No se ha podido leer Amazon: ${(error as Error).message}`
+    }
+    // Un precio escrito en el mensaje manda sobre el leído de Amazon
+    const priceCents = typedPrice ?? product?.priceCents ?? null
     const draft = {
       id: shortId(),
       chatId: String(chatId),
       userId: String(msg.from!.id),
       asin,
-      title: guessTitle(rest, urls),
+      title: product?.title ?? guessTitle(rest, urls),
+      brand: product?.brand ?? null,
       note: '',
       priceCents,
+      basisPriceCents: product?.basisPriceCents ?? null,
+      basisType: product?.basisType ?? null,
+      features: product?.features ?? [],
     }
     await this.ctx.db.insert(intakeDrafts).values(draft)
-    const card = draftCard(draft, await this.manualThemes())
+    const card = draftCard(draft, await this.manualThemes(), { warning })
     const sent = await this.send(chatId, card.text, card.keyboard)
     await this.ctx.db
       .update(intakeDrafts)
@@ -250,7 +266,9 @@ export class IntakeBot {
         ? { priceCents: edit.priceCents }
         : edit.field === 'title'
           ? { title: edit.title }
-          : { note: edit.note }
+          : edit.field === 'features'
+            ? { features: edit.features }
+            : { note: edit.note }
     await this.ctx.db.update(intakeDrafts).set(changes).where(eq(intakeDrafts.id, draft.id))
     const updated = { ...draft, ...changes }
     const card = draftCard(updated, await this.manualThemes())
@@ -308,9 +326,11 @@ export class IntakeBot {
       themeId,
       asin: draft.asin,
       title: draft.title,
-      brand: null,
-      note: draft.note,
+      brand: draft.brand,
+      note: withFeatureBullets(draft.note, draft.features),
       priceCents: draft.priceCents,
+      basisPriceCents: draft.priceCents != null ? draft.basisPriceCents : null,
+      basisType: draft.basisType,
     })
     const { runId } = await withRun(db, 'scan', 'manual', themeId, (log) =>
       scanTheme(db, theme, log, {

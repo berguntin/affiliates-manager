@@ -50,5 +50,6 @@ export function fromCreatorsItem(item: CreatorsItem, source: ProviderId, capture
     detailPageUrl: item.detailPageURL,
     imageUrl: item.images?.primary?.large?.url ?? item.images?.primary?.medium?.url ?? null,
     offer: listing ? toOffer(listing) : null,
+    features: (item.itemInfo?.features?.displayValues ?? []).map((f) => f.trim()).filter(Boolean),
   }
 }
