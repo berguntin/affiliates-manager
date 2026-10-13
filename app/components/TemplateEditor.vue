@@ -24,14 +24,14 @@ watch(
 )
 
 const withPrice = ref(true)
-const preview = ref<{ text: string; warnings: string[] } | null>(null)
+const preview = ref<{ text: string; warnings: string[]; legalChannel: string | null } | null>(null)
 const { run, pending } = useApiAction()
 
 async function updatePreview() {
   if (!data.value) return // sin plantilla cargada no hay nada que previsualizar
   preview.value =
     (await run(() =>
-      apiFetch<{ text: string; warnings: string[] }>('/api/templates/preview', {
+      apiFetch<{ text: string; warnings: string[]; legalChannel: string | null }>('/api/templates/preview', {
         method: 'POST',
         body: { format: props.format, body: body.value, withPrice: withPrice.value },
       }),
@@ -93,6 +93,14 @@ const channelType = computed(() => (props.format === 'telegram-html' ? 'telegram
       <UAlert v-for="w in preview.warnings" :key="w" color="warning" variant="subtle" :description="w" />
       <!-- eslint-disable-next-line vue/no-v-html -- HTML saneado en messageToHtml -->
       <div class="whitespace-pre-wrap break-words rounded-md bg-elevated/50 p-3 text-sm" v-html="messageToHtml(preview.text, channelType)" />
+      <p class="text-xs text-muted">
+        <template v-if="preview.legalChannel">
+          Avisos legales en una línea, enlazados al aviso del canal «{{ preview.legalChannel }}». Los añade el sistema, no la plantilla.
+        </template>
+        <template v-else>
+          Avisos legales completos: los añade el sistema, no la plantilla. Para acortarlos, rellena «Enlace al aviso legal» en el canal.
+        </template>
+      </p>
     </div>
   </div>
 </template>

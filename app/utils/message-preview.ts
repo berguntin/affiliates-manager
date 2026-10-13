@@ -4,10 +4,14 @@
  */
 export function messageToHtml(text: string, format: 'telegram' | 'whatsapp'): string {
   if (format === 'telegram') {
-    // El texto ya es HTML de Telegram: se escapa entero y se reactivan <b> e <i>.
+    // El texto ya es HTML de Telegram: se escapa entero y se reactivan <b>, <i> y los enlaces https.
     const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     return escaped
       .replace(/&lt;(\/?)(b|i)&gt;/g, '<$1$2>')
+      .replace(
+        /&lt;a href="(https:\/\/[^"\s<>]+)"&gt;(.*?)&lt;\/a&gt;/g,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="underline">$2</a>',
+      )
       .replace(/&amp;(amp|lt|gt);/g, '&$1;')
   }
   const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
