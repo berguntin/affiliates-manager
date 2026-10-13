@@ -15,6 +15,8 @@ export interface ProductSnapshot {
   offer: Offer | null
   /** Texto propio asociado (altas manuales). */
   note?: string
+  /** Características del producto tal como las da Amazon (solo se recortan). */
+  features?: string[]
 }
 
 export interface Offer {

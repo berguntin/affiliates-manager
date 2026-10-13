@@ -74,6 +74,7 @@ describe('respuestas a la tarjeta', () => {
     expect(parseDraftReply('24,95')).toEqual({ field: 'price', priceCents: 2495 })
     expect(parseDraftReply('precio: 24,95 €')).toEqual({ field: 'price', priceCents: 2495 })
     expect(parseDraftReply('sin precio')).toEqual({ field: 'price', priceCents: null })
+    expect(parseDraftReply('sin características')).toEqual({ field: 'features', features: [] })
     expect(parseDraftReply('t: Cuna de viaje')).toEqual({ field: 'title', title: 'Cuna de viaje' })
     expect(parseDraftReply('Ideal para viajes')).toEqual({ field: 'note', note: 'Ideal para viajes' })
     expect(parseDraftReply('c: 12 € más barata que ayer')).toEqual({ field: 'note', note: '12 € más barata que ayer' })
@@ -115,6 +116,26 @@ describe('tarjetas', () => {
     expect(text).toContain('Precio: 19,99')
     expect(keyboard[0]![0]).toEqual({ text: '➕ Bebé', callback_data: 't:d1:th1' })
     expect(keyboard.at(-1)![0]!.callback_data).toBe('x:d1')
+  })
+
+  it('la tarjeta del borrador muestra el descuento, las características y el aviso', () => {
+    const { text } = draftCard(
+      {
+        id: 'd1',
+        asin: 'B08N5WRWNW',
+        title: 'Auriculares',
+        note: '',
+        priceCents: 2999,
+        basisPriceCents: 3999,
+        basisType: 'LIST_PRICE',
+        features: ['Batería de 30 h'],
+      },
+      [],
+      { warning: 'Amazon no muestra precio' },
+    )
+    expect(text).toContain('Precio: 29,99\u00a0€ (−25%, PVP rec. 39,99\u00a0€)')
+    expect(text).toContain('🔋 Batería de 30 h')
+    expect(text).toContain('⚠️ Amazon no muestra precio')
   })
 
   it('la tarjeta en cola ofrece acciones solo para lo pendiente', () => {

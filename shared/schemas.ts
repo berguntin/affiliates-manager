@@ -93,13 +93,16 @@ export type ChannelData = z.output<typeof channelInputSchema>
 
 export const ASIN_RE = /^[A-Z0-9]{10}$/
 
+/** Texto propio del alta manual (comentario y viñetas de características). */
+export const NOTE_MAX = 1000
+
 export const manualProductInputSchema = z.object({
   themeId: z.string().min(1),
   /** ASIN, URL de amazon.es o enlace corto de Amazon (link.amazon, amzn.eu…). */
   asinOrUrl: z.string().trim().min(10).max(2000),
   title: z.string().trim().min(3).max(300),
   brand: z.string().trim().max(100).nullable().default(null),
-  note: z.string().trim().max(500).default(''),
+  note: z.string().trim().max(NOTE_MAX).default(''),
   /** Precio visto ahora en Amazon; se publica con la fecha y hora del alta. */
   priceCents: z.number().int().min(1).nullable().default(null),
   /** Precio de referencia visto en Amazon: con él se calcula y se muestra el descuento. */
@@ -121,6 +124,9 @@ export function checkManualPrices(
 }
 
 export type ManualProductInput = z.input<typeof manualProductInputSchema>
+
+/** «Rellenar desde Amazon»: el mismo campo de enlace o ASIN del alta manual. */
+export const productLookupInputSchema = manualProductInputSchema.pick({ asinOrUrl: true })
 
 /** Petición de «Redactar con IA» en el alta manual: la IA solo amplía las notas. */
 export const describeInputSchema = z.object({

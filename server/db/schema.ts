@@ -227,6 +227,12 @@ export const intakeDrafts = sqliteTable(
     title: text('title'),
     note: text('note').notNull().default(''),
     priceCents: integer('price_cents'),
+    brand: text('brand'),
+    /** Precio tachado o PVP recomendado leído de Amazon. */
+    basisPriceCents: integer('basis_price_cents'),
+    basisType: text('basis_type').$type<ManualBasisType>(),
+    /** Características leídas de Amazon; van en viñetas tras el comentario. */
+    features: jsonList('features'),
     themeId: text('theme_id').references(() => themes.id, { onDelete: 'set null' }),
     publicationIds: jsonList('publication_ids'),
     queuedAt: timestamp('queued_at'),

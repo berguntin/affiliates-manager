@@ -2,7 +2,9 @@
  * Bot buzón (SPEC §14.8): lógica pura para convertir lo que se comparte desde la app de
  * Amazon en un borrador de alta manual, y para componer las tarjetas del chat.
  */
+import { NOTE_MAX } from '../../shared/schemas'
 import { parseAsin } from './affiliate'
+import { featureBullets } from './amazon-page'
 import { truncate } from './text'
 
 /** Dominios de enlaces cortos de Amazon: solo se resuelve su redirección (nunca la página). */
@@ -96,19 +98,21 @@ export type DraftEdit =
   | { field: 'price'; priceCents: number | null }
   | { field: 'title'; title: string }
   | { field: 'note'; note: string }
+  | { field: 'features'; features: [] }
 
 /** Interpreta una respuesta a la tarjeta del borrador. */
 export function parseDraftReply(text: string): DraftEdit | null {
   const t = text.trim()
   if (!t) return null
   if (/^(sin precio|quitar precio|-)$/i.test(t)) return { field: 'price', priceCents: null }
+  if (/^(sin|quitar) (caracteristicas|características|viñetas|vinetas)$/i.test(t)) return { field: 'features', features: [] }
   const labeledPrice = t.match(/^precio\s*:?\s*(.+)$/i)
   const price = parsePriceCents(labeledPrice ? labeledPrice[1]! : t)
   if (price != null) return { field: 'price', priceCents: price }
   const title = t.match(/^(?:t|título|titulo)\s*:\s*(.+)$/is)
   if (title) return { field: 'title', title: truncate(title[1]!.trim(), 300) }
   const note = t.match(/^(?:c|comentario|nota)\s*:\s*(.*)$/is)
-  return { field: 'note', note: truncate((note ? note[1]! : t).trim(), 500) }
+  return { field: 'note', note: truncate((note ? note[1]! : t).trim(), NOTE_MAX) }
 }
 
 export function parseAllowedUserIds(value: string | undefined): string[] {
@@ -162,6 +166,16 @@ export interface DraftView {
   title: string | null
   note: string
   priceCents: number | null
+  basisPriceCents?: number | null
+  basisType?: 'WAS_PRICE' | 'LIST_PRICE' | null
+  features?: string[]
+}
+
+/** Descuento del borrador: solo si el precio de referencia es mayor que el precio. */
+export function draftDiscount(draft: Pick<DraftView, 'priceCents' | 'basisPriceCents'>): number | null {
+  const { priceCents, basisPriceCents } = draft
+  if (priceCents == null || basisPriceCents == null || basisPriceCents <= priceCents) return null
+  return Math.round(((basisPriceCents - priceCents) / basisPriceCents) * 100)
 }
 
 export interface InlineButton {
@@ -170,16 +184,31 @@ export interface InlineButton {
   url?: string
 }
 
-export function draftCard(draft: DraftView, themes: { id: string; name: string }[]) {
+export function draftCard(
+  draft: DraftView,
+  themes: { id: string; name: string }[],
+  opts: { warning?: string | null } = {},
+) {
+  const discount = draftDiscount(draft)
+  const basisLabel = draft.basisType === 'LIST_PRICE' ? 'PVP rec.' : 'antes'
+  const price =
+    draft.priceCents != null
+      ? `${esc(eur.format(draft.priceCents / 100))}${discount != null ? ` (−${discount}%, ${basisLabel} ${esc(eur.format(draft.basisPriceCents! / 100))})` : ''}`
+      : 'sin precio'
+  const bullets = featureBullets(draft.features ?? [])
   const lines = [
     '📥 <b>Nueva oferta</b>',
     draft.title ? `<b>${esc(draft.title)}</b>` : '⚠️ <b>Falta el título</b>: responde «t: título»',
     `ASIN: <code>${draft.asin}</code>`,
-    `Precio: ${draft.priceCents != null ? esc(eur.format(draft.priceCents / 100)) : 'sin precio'}`,
+    `Precio: ${price}`,
     `Comentario: ${draft.note ? esc(draft.note) : '—'}`,
-    '',
-    '<i>Responde a este mensaje para cambiarlo: un precio (19,99), «t: título», «sin precio» o cualquier otro texto como comentario.</i>',
   ]
+  if (bullets) lines.push('', esc(bullets))
+  if (opts.warning) lines.push('', `⚠️ ${esc(opts.warning)}`)
+  lines.push(
+    '',
+    '<i>Responde a este mensaje para cambiarlo: un precio (19,99), «t: título», «sin precio», «sin características» o cualquier otro texto como comentario.</i>',
+  )
   if (themes.length === 0) {
     lines.push('', '⚠️ No hay temáticas activas con fuente «Alta manual». Crea una en el panel.')
   } else {
@@ -265,7 +294,7 @@ export const HELP_TEXT = [
   '👋 <b>Buzón de ofertas</b>',
   '',
   '1. En la app de Amazon pulsa <b>Compartir</b> y elige este chat (o pega el enlace).',
-  '2. Si quieres, responde a la tarjeta con el <b>precio</b> (19,99), un <b>comentario</b> o «t: título».',
+  '2. Leo de Amazon el título, el precio y las características. Si quieres, responde a la tarjeta con otro <b>precio</b> (19,99), un <b>comentario</b>, «t: título» o «sin características».',
   '3. Elige la temática: se crea en la cola con la entradilla de IA.',
   '4. Publica, programa o descarta con los botones.',
 ].join('\n')
