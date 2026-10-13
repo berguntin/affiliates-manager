@@ -95,7 +95,7 @@ export const manualProducts = sqliteTable(
     note: text('note').notNull().default(''),
     /**
      * Precio introducido a mano. Se publica con la fecha y hora del alta (SPEC §14.7,
-     * riesgo aceptado). La columna conserva su nombre original.
+     * modo de validación del MVP). La columna conserva su nombre original.
      */
     priceCents: integer('internal_price_cents'),
     /** Precio de referencia visto en Amazon (tachado o PVP recomendado) para mostrar el descuento. */

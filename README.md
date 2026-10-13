@@ -1,28 +1,118 @@
-# Ofertas · panel de canales de afiliados
+# Ofertas · gestor de canales de afiliados de Amazon
 
-Sistema que detecta ofertas de **Amazon.es** por temáticas configurables, prepara mensajes con enlace de afiliado (un tracking ID por canal) y gestiona su publicación en **Telegram** (automática) y **WhatsApp** (asistida). El panel está en español y pensado para usarse desde el móvil.
+Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, prepara los mensajes con enlace de afiliado y gestiona su publicación en **Telegram** (automática) y **WhatsApp** (asistida). El panel está en español y pensado para usarse desde el móvil.
 
-- Requisitos y decisiones: [`SPEC.md`](SPEC.md)
-- Arquitectura y modelo de datos: [`docs/arquitectura.md`](docs/arquitectura.md)
-- Creators API y normas de Afiliados de amazon.es: [`docs/creators-api.md`](docs/creators-api.md)
+> *English summary:* a mobile-first back office to run Amazon affiliate deal channels on Telegram and WhatsApp. It finds deals, filters out inflated discounts, writes on-brand copy with Claude, and schedules or publishes posts. It runs on a single Cloudflare Worker (Nuxt 4, Nitro, D1, Cron Triggers) and is designed around Amazon Associates policy compliance.
 
-> **Estado: fase 1 (MVP).**
-> - Las fuentes de productos son el **alta manual** (se publica **sin precio**, SPEC §14.1) y un **proveedor simulado** para desarrollo.
-> - Fase 2: la **redacción con IA** (entradilla con la Anthropic API, opcional) ya está; la integración con la Creators API, pendiente.
+<p align="center">
+  <img src="docs/img/cola.png" width="250" alt="Cola de publicaciones con el mensaje generado">
+  <img src="docs/img/alta-manual.png" width="250" alt="Alta manual con precio anterior y redacción con IA">
+  <img src="docs/img/resumen.png" width="250" alt="Resumen del día">
+</p>
+
+## Qué hace
+
+1. **Detecta ofertas** por temática (palabras clave, categorías, exclusiones y filtros de precio, valoración y descuento mínimo).
+   - Descarta descuentos poco fiables, como los calculados sobre un PVP recomendado inflado.
+   - Evita repetir el mismo producto dentro de una ventana de días.
+2. **Prepara el mensaje** de cada canal con su propio tracking ID, plantillas por formato (HTML de Telegram o texto de WhatsApp) y los avisos legales obligatorios.
+   - Una **entradilla redactada con IA** (Claude) en el tono de la temática.
+   - Un **texto propio** que la IA amplía a partir de unas notas.
+3. **Gestiona una cola** de candidatas: revisar, editar, aprobar, programar en el siguiente ciclo del cron, publicar o descartar. Las candidatas caducan a las 24 h.
+4. **Publica:**
+   - en **Telegram**, automáticamente vía Bot API;
+   - en **WhatsApp**, de forma asistida: se comparte desde el móvil, porque no hay API oficial para Canales.
+5. **Bot buzón:** se comparte un producto desde la app de Amazon a un bot de Telegram, que lo da de alta, crea la candidata y permite publicarla desde el chat.
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+  subgraph Worker["Cloudflare Worker (Nuxt 4 + Nitro)"]
+    Panel["Panel SPA<br/>Nuxt UI"] --> API["API REST<br/>/api/*"]
+    Cron["Cron Triggers<br/>scan:daily · queue:tick"] --> Services
+    API --> Services["Servicios<br/>escaneo · cola · buzón"]
+    Webhook["Webhook bot buzón<br/>/webhooks/telegram-intake"] --> Services
+    Services --> Domain["Dominio puro<br/>ofertas · mensajes · franjas"]
+    Services --> Providers["ProductProvider<br/>manual · simulado · Creators API"]
+    Services --> Channels["ChannelAdapter<br/>Telegram · WhatsApp"]
+  end
+  Access["Cloudflare Access<br/>+ validación JWT"] --> Panel
+  Services --> D1[("D1 · Drizzle")]
+  Services --> Claude["Anthropic API<br/>(Claude)"]
+  Channels --> TG["Telegram Bot API"]
+  Providers -.-> Amazon["Amazon Creators API<br/>(fase 2)"]
+```
+
+- **Un solo Worker** sirve el panel, la API, el webhook del bot y las tareas programadas. No hay servidores que mantener y el coste es prácticamente cero con el volumen previsto.
+- **Lógica de negocio pura y testeada** en `server/domain`: evaluación de ofertas, deduplicación, plantillas, estados de publicación y franjas horarias. No tiene E/S, así que se prueba sin mocks.
+- **Puertos y adaptadores:** `ProductProvider` y `ChannelAdapter` aíslan Amazon y las redes. Cambiar el proveedor simulado por la Creators API no toca el dominio.
+
+Más detalle en [`docs/arquitectura.md`](docs/arquitectura.md).
+
+## Decisiones técnicas destacadas
+
+- **Cumplimiento de las normas de Afiliados como requisito de diseño.** Antes de escribir código se analizaron la Licencia y las Políticas de Amazon ([`docs/creators-api.md`](docs/creators-api.md)). De ahí salen varias reglas:
+  - sin scraping;
+  - sin almacenar imágenes (la vista previa la genera cada red a partir del enlace);
+  - precio siempre con fecha y hora de consulta y descargo legal;
+  - purga de los datos de producto a las 24 h;
+  - un tracking ID por canal.
+
+  Cada decisión está registrada en [`SPEC.md`](SPEC.md) §13–14.
+- **IA con salvaguardas.** Claude solo redacta texto propio, nunca describe ni reescribe contenido de Amazon (la Licencia lo prohíbe). Cada texto se valida antes de usarse:
+  - sin cifras ni precios inventados;
+  - sin enlaces ni formato;
+  - sin afirmaciones de «mínimo histórico» o envío;
+  - sin repetir el título.
+
+  Si la IA falla o el texto no pasa la validación, el mensaje sale solo con la plantilla.
+- **Detección de descuentos inflados.** El descuento se clasifica según su referencia:
+  - precio anterior real;
+  - PVP recomendado;
+  - histórico externo.
+
+  Si la referencia es el PVP recomendado y el porcentaje es muy alto, se marca como sospechoso.
+- **Programación honesta.** La hora programada se alinea con el ciclo real del cron (cada 10 min). El panel muestra la hora real de publicación, no la pedida. Un test comprueba que el ciclo coincide con la configuración de `wrangler.jsonc`.
+- **Seguridad:**
+  - el panel va detrás de Cloudflare Access y la API valida además el JWT y el email autorizado;
+  - el webhook del bot se autentica con el token secreto de Telegram, comparado en tiempo constante;
+  - la resolución de enlaces cortos sigue solo las redirecciones y nunca descarga páginas de Amazon;
+  - los secretos solo se guardan como secretos de Wrangler.
+- **Proceso.** Primero la especificación (SPEC con riesgos y decisiones), luego fases incrementales con TypeScript estricto, validación con zod compartida entre panel y API, y tests de la lógica de negocio con Vitest.
 
 ## Stack
 
-- Nuxt 4 + Nitro (preset `cloudflare_module`) en un único Cloudflare Worker. El panel es una SPA con Nuxt UI.
-- Cloudflare D1 con Drizzle ORM. Las migraciones SQL están en `server/db/migrations`.
-- Cron Triggers enlazados a tareas Nitro:
+| Capa | Tecnología |
+|---|---|
+| Frontend | Nuxt 4 (SPA), Nuxt UI 4, Tailwind; mobile-first |
+| Backend | Nitro (preset `cloudflare_module`) en Cloudflare Workers |
+| Datos | Cloudflare D1 (SQLite) con Drizzle ORM y migraciones SQL |
+| Tareas | Cron Triggers enlazados a tareas Nitro |
+| IA | Anthropic API (Claude) con el SDK oficial |
+| Auth | Cloudflare Access + validación del JWT con `jose` |
+| Calidad | TypeScript estricto, zod, Vitest |
 
 | Cron (UTC) | Tarea | Qué hace |
 |---|---|---|
 | `0 5 * * *` | `scan:daily` | Escanea todas las temáticas activas |
 | `*/10 * * * *` | `queue:tick` | Publica lo programado, caduca a las 24 h y purga datos de producto |
 
-- Autenticación con **Cloudflare Access**, más validación del JWT en la API.
-- TypeScript estricto y Vitest.
+## Estado
+
+- **Fase 1 (MVP):** completada y desplegada.
+  - Fuentes: alta manual y proveedor simulado.
+  - Publicación en Telegram y WhatsApp asistido.
+  - Redacción con IA.
+  - Bot buzón.
+- **Fase 2:** integración con la Creators API de Amazon (pendiente de acceso a la API) y estadísticas.
+- **Fase 3:** posible versión SaaS, condicionada a validar la idea ([`SPEC.md`](SPEC.md) §12).
+
+Documentación: [`SPEC.md`](SPEC.md) (requisitos, riesgos y decisiones) · [`docs/arquitectura.md`](docs/arquitectura.md) (arquitectura y modelo de datos) · [`docs/creators-api.md`](docs/creators-api.md) (Creators API y normas de Afiliados).
+
+---
+
+# Guía de instalación y despliegue
 
 ## Puesta en marcha local
 
@@ -123,7 +213,7 @@ Un **bot aparte** del que publica. Compartís un producto desde la app de Amazon
 
 1. El bot saca el ASIN del enlace. Los enlaces cortos `amzn.eu` se resuelven siguiendo solo la redirección; nunca se abre la página del producto.
 2. Responde con una tarjeta. **Respondiendo a ella** podéis añadir:
-   - el precio (`19,99`), que se publica con la fecha y hora del alta (SPEC §14.7, riesgo aceptado);
+   - el precio (`19,99`), que se publica con la fecha y hora del alta (SPEC §14.7, modo de validación hasta tener la Creators API);
    - el título (`t: …`), si no venía en el texto compartido;
    - un comentario (cualquier otro texto).
 3. Elegís la temática (solo las de fuente «Alta manual»). Se crea la candidata en cada canal con la entradilla de IA.
@@ -176,3 +266,9 @@ server/
   db/             Esquema Drizzle y migraciones
 tests/            Vitest
 ```
+
+## Licencia
+
+© 2026 Hugo Bermúdez. Todos los derechos reservados.
+
+El código se publica como portfolio para que pueda consultarse. No se concede licencia de uso, copia, modificación ni distribución sin permiso expreso del autor.

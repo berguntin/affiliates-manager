@@ -25,7 +25,7 @@ export interface ManualProductSource {
 
 /**
  * Productos dados de alta a mano (panel o bot buzón). Si se indicó precio, se publica
- * con la fecha y hora del alta (SPEC §14.7, riesgo aceptado); si no, sin precio.
+ * con la fecha y hora del alta (SPEC §14.7, modo de validación del MVP); si no, sin precio.
  * El enlace es el estándar de Afiliados.
  */
 export class ManualProvider implements ProductProvider {
