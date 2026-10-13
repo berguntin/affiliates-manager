@@ -1,5 +1,5 @@
 import { manualProductInputSchema } from '../../../../shared/schemas'
-import { parseAsin } from '../../../domain/affiliate'
+import { resolveAsinInput } from '../../../services/intake'
 import { addManualProduct } from '../../../services/manual-products'
 import { withRun } from '../../../services/runs'
 import { scanTheme } from '../../../services/scan'
@@ -15,9 +15,12 @@ export default defineEventHandler(async (event) => {
   if (theme.provider !== 'manual') {
     throw createError({ statusCode: 400, message: 'La temática no usa la fuente «Alta manual»' })
   }
-  const asin = parseAsin(input.asinOrUrl)
+  const asin = await resolveAsinInput(input.asinOrUrl)
   if (!asin) {
-    throw createError({ statusCode: 400, message: 'No se reconoce el ASIN ni una URL de amazon.es' })
+    throw createError({
+      statusCode: 400,
+      message: 'No se reconoce el producto: pega un ASIN, una URL de amazon.es o un enlace compartido desde la app de Amazon',
+    })
   }
   await addManualProduct(db, {
     themeId,

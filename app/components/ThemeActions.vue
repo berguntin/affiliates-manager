@@ -84,7 +84,7 @@ async function addManual() {
         <p class="text-xs text-muted">Se crea la candidata al momento. Si indicas precio, se publica con la fecha y hora del alta.</p>
       </template>
       <form class="space-y-3" @submit.prevent="addManual">
-        <UFormField label="URL de amazon.es o ASIN" required>
+        <UFormField label="Enlace de Amazon o ASIN" required help="URL de amazon.es, enlace compartido desde la app (link.amazon, amzn.eu) o ASIN.">
           <UInput
             v-model="manual.asinOrUrl"
             placeholder="https://www.amazon.es/dp/B0…"

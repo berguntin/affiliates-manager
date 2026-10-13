@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { INTAKE_USER_AGENT, resolveShortLink, safeEqual } from '../../server/services/intake'
+import { INTAKE_USER_AGENT, resolveAsinInput, resolveShortLink, safeEqual } from '../../server/services/intake'
 
 const redirect = (location: string) => new Response(null, { status: 301, headers: { location } })
 
@@ -42,6 +42,28 @@ describe('resolveShortLink', () => {
   it('devuelve null si no hay redirección', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(new Response('ok', { status: 200 }))
     expect(await resolveShortLink('https://amzn.eu/d/abc', fetchFn)).toBeNull()
+  })
+})
+
+describe('resolveAsinInput (alta manual del panel y bot)', () => {
+  it('acepta ASIN y URLs de amazon.es sin ninguna petición', async () => {
+    const fetchFn = vi.fn()
+    expect(await resolveAsinInput('B08N5WRWNW', fetchFn)).toBe('B08N5WRWNW')
+    expect(await resolveAsinInput(' https://www.amazon.es/dp/B08N5WRWNW?th=1 ', fetchFn)).toBe('B08N5WRWNW')
+    expect(fetchFn).not.toHaveBeenCalled()
+  })
+
+  it('resuelve enlaces cortos de la app', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(redirect('https://amzlinks.in/B0f5YONr0'))
+      .mockResolvedValueOnce(redirect('https://www.amazon.es/dp/B0GTLLDXNX?tag=x-21'))
+    expect(await resolveAsinInput('https://link.amazon/B0f5YONr0', fetchFn)).toBe('B0GTLLDXNX')
+  })
+
+  it('devuelve null con enlaces que no son de Amazon o si falla la red', async () => {
+    expect(await resolveAsinInput('https://example.com/x', vi.fn())).toBeNull()
+    expect(await resolveAsinInput('https://link.amazon/x', vi.fn().mockRejectedValue(new Error('red')))).toBeNull()
   })
 })
 

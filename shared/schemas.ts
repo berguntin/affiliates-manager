@@ -84,7 +84,7 @@ export const ASIN_RE = /^[A-Z0-9]{10}$/
 
 export const manualProductInputSchema = z.object({
   themeId: z.string().min(1),
-  /** ASIN o URL de amazon.es de la que se extrae el ASIN. */
+  /** ASIN, URL de amazon.es o enlace corto de Amazon (link.amazon, amzn.eu…). */
   asinOrUrl: z.string().trim().min(10).max(2000),
   title: z.string().trim().min(3).max(300),
   brand: z.string().trim().max(100).nullable().default(null),

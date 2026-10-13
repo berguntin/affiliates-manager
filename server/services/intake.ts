@@ -94,6 +94,23 @@ export async function resolveShortLink(url: string, fetchFn: typeof fetch = fetc
   return null
 }
 
+/**
+ * ASIN a partir de lo que pega o comparte una persona: un ASIN, una URL de amazon.es o
+ * un enlace corto (link.amazon, amzn.eu…). Lo usan el bot buzón y el alta manual del panel.
+ */
+export async function resolveAsinInput(input: string, fetchFn: typeof fetch = fetch): Promise<string | null> {
+  const direct = parseAsin(input)
+  if (direct) return direct
+  const picked = pickAmazonUrl(extractUrls(input.trim()))
+  if (!picked) return null
+  if ('asin' in picked) return picked.asin
+  try {
+    return await resolveShortLink(picked.shortUrl, fetchFn)
+  } catch {
+    return null
+  }
+}
+
 function shortId(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
   const bytes = crypto.getRandomValues(new Uint8Array(10))
