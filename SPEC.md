@@ -165,10 +165,38 @@ Interfaz abstracta con al menos tres implementaciones:
 - ✅ Redacción con LLM (Anthropic API) con fallback a plantilla (§14.6).
 - Estadísticas.
 
+### Fase 3 — Posible SaaS (hoja de ruta, sin compromiso)
+
+Hipótesis: los administradores de canales de chollos en Telegram y WhatsApp pagarían por una herramienta que les ahorre trabajo **sin arriesgar su cuenta de Afiliados**. El cumplimiento de las normas de Amazon es el argumento diferencial frente a herramientas que hacen scraping.
+
+**1. Validar antes de construir.** No se empieza la Fase 3 sin señales en estos tres puntos:
+- **Uso propio.** Los canales propios generan clics y comisiones (informes de Associates Central por tracking ID), y la herramienta ahorra un tiempo medible a la semana.
+- **Entrevistas.** Hablar con 5–10 administradores de canales sobre su flujo actual, qué les quita más tiempo, si tienen acceso a la Creators API y si pagarían, y cuánto.
+- **Pilotos a mano.** Con 2–3 interesados, una instalación dedicada por cliente (su propio Worker y su propia D1) antes de hacer la plataforma multicliente.
+
+**2. Restricciones de producto, por las normas de Amazon.** Las decisiones de riesgo aceptado de la fase 1 son del propietario y **no se trasladan a clientes**:
+- **Precio y descuento manuales (§14.7).** En SaaS desaparecen o quedan en modo «solo API». Las altas manuales se publican sin precio, como en §14.1.
+- **Credenciales propias.** Cada cliente usa su propia cuenta de Afiliados y sus credenciales de la Creators API, nunca las de la plataforma. Amazon solo da acceso a la API a afiliados con ventas recientes, así que el público inicial son canales que ya generan comisiones; sin API, la herramienta se queda en alta manual sin precio.
+- **Mismas reglas para todos.** Sin scraping, sin almacenar imágenes y con los textos de IA limitados a lo que permite la Licencia (§14.6 y §14.9). Hay que revisar si los términos de Afiliados y de la Creators API permiten que un tercero opere la API por cuenta del afiliado, y documentarlo antes de lanzar.
+- **WhatsApp.** Sigue siendo asistido: no hay API oficial para publicar en Canales. Hay que comunicarlo con claridad.
+
+**3. Trabajo técnico** (la base actual se mantiene: Workers, D1, Nitro y la lógica separada en dominio, proveedores y canales):
+- **Multicliente.** Un `tenant_id` en todas las tablas y en todas las consultas, o una D1 por cliente. Hay que decidirlo en función del volumen.
+- **Autenticación propia.** Registro, login y equipos con roles, porque Cloudflare Access no sirve para clientes.
+- **Cobros.** Stripe, con planes según el número de canales, de temáticas y de redacciones con IA.
+- **Secretos de cliente cifrados en la base de datos.** Credenciales de la Creators API y tokens de bots, cifrados con una clave del Worker (no como secretos de wrangler). Se rotan y se borran al dar de baja al cliente.
+- **Telegram.** O el cliente añade como administrador el bot de la plataforma, o registra su propio bot, y cada bot buzón tiene su propio webhook.
+- **Escalado del cron.** Los escaneos y las publicaciones de cada cliente se reparten con Cloudflare Queues, por los límites de subpeticiones y de CPU de una ejecución.
+- **Costes de IA.** Límites por cliente y plan, y registro del consumo de tokens.
+- **Operación.**
+  - Registro de actividad por cliente, alertas cuando una publicación falla y exportación y borrado de datos (RGPD).
+  - Términos de uso que dejan al cliente como responsable de su cuenta de Afiliados.
+
 ### Fuera de alcance por ahora
 
 - Integración real con Keepa (solo interfaz preparada).
 - Otros canales (Instagram, etc.).
+- Versión SaaS: ver la hoja de ruta de la Fase 3, que depende de la validación.
 
 ---
 
