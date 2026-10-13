@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ProviderId } from '#shared/types'
+import type { ManualBasisType, ProviderId } from '#shared/types'
 
 const props = defineProps<{ themeId: string; provider: ProviderId }>()
 const toast = useToast()
@@ -36,6 +36,26 @@ const manual = reactive({
   brand: '',
   note: '',
   priceCents: null as number | null,
+  basisPriceCents: null as number | null,
+  basisType: 'WAS_PRICE' as ManualBasisType,
+})
+
+const basisOptions = [
+  { label: 'Precio anterior (tachado)', value: 'WAS_PRICE' },
+  { label: 'PVP recomendado', value: 'LIST_PRICE' },
+]
+
+/** Mismo cálculo que el servidor: solo hay descuento si el precio de referencia es mayor. */
+const manualDiscount = computed(() => {
+  const { priceCents, basisPriceCents } = manual
+  if (priceCents == null || basisPriceCents == null || basisPriceCents <= priceCents) return null
+  return Math.round(((basisPriceCents - priceCents) / basisPriceCents) * 100)
+})
+const basisError = computed(() => {
+  if (manual.basisPriceCents == null) return undefined
+  if (manual.priceCents == null) return 'Indica también el precio actual'
+  if (manual.basisPriceCents <= manual.priceCents) return 'Debe ser mayor que el precio actual'
+  return undefined
 })
 
 const { data: recent, refresh: refreshRecent } = await useFetch<
@@ -75,6 +95,8 @@ async function addManual() {
         brand: manual.brand.trim() || null,
         note: manual.note,
         priceCents: manual.priceCents,
+        basisPriceCents: manual.basisPriceCents,
+        basisType: manual.basisType,
       },
     }),
   )
@@ -85,7 +107,15 @@ async function addManual() {
     color: result.created ? 'success' : 'warning',
     actions: result.created ? [{ label: 'Ver cola', to: '/cola' }] : undefined,
   })
-  Object.assign(manual, { asinOrUrl: '', title: '', brand: '', note: '', priceCents: null })
+  Object.assign(manual, {
+    asinOrUrl: '',
+    title: '',
+    brand: '',
+    note: '',
+    priceCents: null,
+    basisPriceCents: null,
+    basisType: 'WAS_PRICE',
+  })
   notesBeforeAi.value = null
   await refreshRecent()
 }
@@ -105,7 +135,7 @@ async function addManual() {
     <UCard v-else>
       <template #header>
         <h2 class="font-medium">Alta manual de producto</h2>
-        <p class="text-xs text-muted">Se crea la candidata al momento. Si indicas precio, se publica con la fecha y hora del alta.</p>
+        <p class="text-xs text-muted">Se crea la candidata al momento. Si indicas precio, se publica con la fecha y hora del alta; con el precio anterior, también el descuento.</p>
       </template>
       <form class="space-y-3" @submit.prevent="addManual">
         <UFormField label="Enlace de Amazon o ASIN" required help="URL de amazon.es, enlace compartido desde la app (link.amazon, amzn.eu) o ASIN.">
@@ -120,14 +150,24 @@ async function addManual() {
         <UFormField label="Título" required>
           <UInput v-model="manual.title" class="w-full" />
         </UFormField>
+        <UFormField label="Marca">
+          <UInput v-model="manual.brand" class="w-full" />
+        </UFormField>
         <div class="grid gap-3 sm:grid-cols-2">
-          <UFormField label="Marca">
-            <UInput v-model="manual.brand" class="w-full" />
-          </UFormField>
           <UFormField label="Precio actual" help="Opcional. Se publica con la fecha y hora de ahora.">
             <EuroInput v-model="manual.priceCents" placeholder="Opcional" />
           </UFormField>
+          <UFormField
+            label="Precio antes del descuento"
+            :error="basisError"
+            :help="manualDiscount != null ? `Se publicará −${manualDiscount}%` : 'Opcional. El precio tachado o el PVP recomendado que muestra Amazon.'"
+          >
+            <EuroInput v-model="manual.basisPriceCents" placeholder="Opcional" />
+          </UFormField>
         </div>
+        <UFormField v-if="manual.basisPriceCents != null" label="¿Qué precio es?">
+          <URadioGroup v-model="manual.basisType" :items="basisOptions" orientation="horizontal" />
+        </UFormField>
         <UFormField
           label="Texto propio"
           help="Por qué lo recomiendas. Aparece en el mensaje. Escribe unas notas rápidas y la IA las convierte en un texto con el tono de la temática; revísalo antes de crear la candidata."

@@ -16,6 +16,7 @@ import type {
   RunKind,
   RunStatus,
   RunTrigger,
+  ManualBasisType,
   SavingBasisType,
 } from '../../shared/types'
 
@@ -97,6 +98,9 @@ export const manualProducts = sqliteTable(
      * riesgo aceptado). La columna conserva su nombre original.
      */
     priceCents: integer('internal_price_cents'),
+    /** Precio de referencia visto en Amazon (tachado o PVP recomendado) para mostrar el descuento. */
+    basisPriceCents: integer('basis_price_cents'),
+    basisType: text('basis_type').$type<ManualBasisType>(),
     /** Se marca al convertirlo en candidata. */
     consumedAt: timestamp('consumed_at'),
     createdAt: timestamp('created_at').notNull().default(now),

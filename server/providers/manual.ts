@@ -1,3 +1,4 @@
+import type { ManualBasisType } from '../../shared/types'
 import { buildManualLink } from '../domain/affiliate'
 import type { ProductSnapshot } from '../domain/product'
 import type { ProductProvider, ThemeSearchQuery } from './types'
@@ -9,6 +10,9 @@ export interface ManualProductRecord {
   note: string
   /** Precio introducido a mano (null = se publica sin precio). */
   priceCents: number | null
+  /** Precio de referencia (tachado o PVP recomendado) para el descuento; solo con precio. */
+  basisPriceCents: number | null
+  basisType: ManualBasisType | null
   /** Momento del alta: es la «hora de consulta» del precio. */
   createdAt: number
 }
@@ -47,8 +51,7 @@ export class ManualProvider implements ProductProvider {
           ? {
               priceCents: record.priceCents,
               currency: 'EUR',
-              savingBasisCents: null,
-              savingBasisType: null,
+              ...manualBasis(record),
               savingsPercent: null,
               availability: null,
               condition: 'New',
@@ -72,4 +75,13 @@ export class ManualProvider implements ProductProvider {
     const records = await this.source.latestByAsin(asins)
     return records.map((r) => this.toSnapshot(r, partnerTag))
   }
+}
+
+/** El precio de referencia solo cuenta si es mayor que el precio (si no, no hay descuento). */
+function manualBasis(record: ManualProductRecord) {
+  const valid =
+    record.priceCents != null && record.basisPriceCents != null && record.basisPriceCents > record.priceCents
+  return valid
+    ? { savingBasisCents: record.basisPriceCents, savingBasisType: record.basisType ?? 'WAS_PRICE' }
+    : { savingBasisCents: null, savingBasisType: null }
 }

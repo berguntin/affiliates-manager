@@ -95,7 +95,18 @@ export function evaluateDeal(
   // Las altas manuales son una selección explícita: no se aplican filtros de oferta.
   if (snapshot.source === 'manual') {
     notes.push(offer ? 'Alta manual: precio introducido a mano' : 'Alta manual: se publica sin precio')
-    return result('none', null, false)
+    const manualPct =
+      offer?.savingBasisCents && offer.savingBasisCents > offer.priceCents
+        ? pct(offer.savingBasisCents, offer.priceCents)
+        : null
+    if (manualPct != null) {
+      notes.push(
+        offer?.savingBasisType === 'LIST_PRICE'
+          ? `Descuento introducido a mano: −${manualPct}% sobre el PVP recomendado`
+          : `Descuento introducido a mano: −${manualPct}% sobre el precio anterior`,
+      )
+    }
+    return result('none', manualPct, false)
   }
   if (!offer) {
     rejections.push('Sin oferta disponible')

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { CHANNEL_TYPES, PROVIDER_IDS } from './types'
+import { CHANNEL_TYPES, MANUAL_BASIS_TYPES, PROVIDER_IDS } from './types'
 
 /** Validaciones compartidas por la API y los formularios del panel. */
 
@@ -91,7 +91,23 @@ export const manualProductInputSchema = z.object({
   note: z.string().trim().max(500).default(''),
   /** Precio visto ahora en Amazon; se publica con la fecha y hora del alta. */
   priceCents: z.number().int().min(1).nullable().default(null),
+  /** Precio de referencia visto en Amazon: con él se calcula y se muestra el descuento. */
+  basisPriceCents: z.number().int().min(1).nullable().default(null),
+  basisType: z.enum(MANUAL_BASIS_TYPES).default('WAS_PRICE'),
 })
+
+/** Validaciones cruzadas del alta manual (el endpoint las aplica tras omitir `themeId`). */
+export function checkManualPrices(
+  input: { priceCents: number | null; basisPriceCents: number | null },
+  ctx: z.RefinementCtx,
+) {
+  if (input.basisPriceCents == null) return
+  if (input.priceCents == null) {
+    ctx.addIssue({ code: 'custom', path: ['basisPriceCents'], message: 'Indica también el precio actual' })
+  } else if (input.basisPriceCents <= input.priceCents) {
+    ctx.addIssue({ code: 'custom', path: ['basisPriceCents'], message: 'Debe ser mayor que el precio actual' })
+  }
+}
 
 export type ManualProductInput = z.input<typeof manualProductInputSchema>
 

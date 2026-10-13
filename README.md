@@ -40,7 +40,7 @@ pnpm dev                              # http://localhost:3000
 Primeros pasos en el panel:
 1. **Canales → Nuevo**: crea un canal de Telegram o WhatsApp con su tracking ID.
 2. **Temáticas → Nueva**: elige «Simulado (desarrollo)» o «Alta manual» y asígnale canales.
-3. **Resumen → Escanear ahora**, o, en una temática manual, **Añadir y crear candidata**. Si escribes unas notas en «Texto propio», **Redactar con IA** las convierte en un texto con el tono de la temática.
+3. **Resumen → Escanear ahora**, o, en una temática manual, **Añadir y crear candidata**. Con «Precio actual» y «Precio antes del descuento» se publica el descuento. Si escribes unas notas en «Texto propio», **Redactar con IA** las convierte en un texto con el tono de la temática.
 4. **Cola**: revisa, edita, aprueba, programa o publica.
 
 ### Comandos

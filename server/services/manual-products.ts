@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import type { ManualBasisType } from '../../shared/types'
 import type { ManualProductSource } from '../providers/manual'
 import type { Db } from '../utils/db'
 import { schema } from '../utils/db'
@@ -36,6 +37,8 @@ export async function addManualProduct(
     brand: string | null
     note: string
     priceCents: number | null
+    basisPriceCents?: number | null
+    basisType?: ManualBasisType | null
   },
 ) {
   const id = crypto.randomUUID()

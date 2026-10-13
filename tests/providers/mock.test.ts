@@ -117,7 +117,7 @@ describe('ManualProvider', () => {
     const provider = new ManualProvider(
       {
         pendingForTheme: async () => [
-          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: 2999, createdAt },
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: 2999, createdAt, basisPriceCents: null, basisType: null },
         ],
         latestByAsin: async () => [],
       },
@@ -129,14 +129,37 @@ describe('ManualProvider', () => {
     expect(found!.offer?.savingsPercent).toBeNull()
   })
 
+  it('con precio anterior calcula el descuento y lo rotula según el tipo', async () => {
+    const record = { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: 2999, createdAt: 1 }
+    const provider = new ManualProvider(
+      {
+        pendingForTheme: async () => [
+          { ...record, basisPriceCents: 3999, basisType: 'LIST_PRICE' as const },
+          { ...record, asin: 'B000000002', basisPriceCents: 2500, basisType: 'WAS_PRICE' as const },
+        ],
+        latestByAsin: async () => [],
+      },
+      now,
+    )
+    const [withBasis, lowerBasis] = await provider.search(query)
+    expect(withBasis!.offer).toMatchObject({ savingBasisCents: 3999, savingBasisType: 'LIST_PRICE' })
+    const evaluation = evaluateDeal(withBasis!, { minDiscountPct: 50, minPriceCents: null, maxPriceCents: null, excludeKeywords: [], excludeBrands: [] })
+    expect(evaluation.eligible).toBe(true)
+    expect(evaluation.effectiveDiscountPct).toBe(25)
+    expect(evaluation.notes).toContain('Descuento introducido a mano: −25% sobre el PVP recomendado')
+    // Un «precio anterior» menor que el actual no es un descuento: se ignora.
+    expect(lowerBasis!.offer).toMatchObject({ savingBasisCents: null, savingBasisType: null })
+    expect(evaluateDeal(lowerBasis!, { minDiscountPct: 0, minPriceCents: null, maxPriceCents: null, excludeKeywords: [], excludeBrands: [] }).effectiveDiscountPct).toBeNull()
+  })
+
   it('sin precio no devuelve oferta y construye el enlace con el tag del canal', async () => {
     const provider = new ManualProvider(
       {
         pendingForTheme: async () => [
-          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: 'Mi nota', priceCents: null, createdAt: 1 },
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: 'Mi nota', priceCents: null, createdAt: 1, basisPriceCents: null, basisType: null },
         ],
         latestByAsin: async () => [
-          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: null, createdAt: 1 },
+          { asin: 'B08N5WRWNW', title: 'Echo Dot', brand: null, note: '', priceCents: null, createdAt: 1, basisPriceCents: null, basisType: null },
         ],
       },
       now,

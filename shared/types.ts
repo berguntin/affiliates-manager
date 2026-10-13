@@ -27,6 +27,10 @@ export const SAVING_BASIS_TYPES = [
 ] as const
 export type SavingBasisType = (typeof SAVING_BASIS_TYPES)[number]
 
+/** Precio de referencia que se puede indicar en un alta manual. */
+export const MANUAL_BASIS_TYPES = ['WAS_PRICE', 'LIST_PRICE'] as const satisfies readonly SavingBasisType[]
+export type ManualBasisType = (typeof MANUAL_BASIS_TYPES)[number]
+
 /**
  * Fiabilidad del descuento:
  * - `reference`: calculado sobre un precio anterior real (WAS_PRICE / LOWEST_PRICE…).

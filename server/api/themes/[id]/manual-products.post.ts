@@ -1,4 +1,4 @@
-import { manualProductInputSchema } from '../../../../shared/schemas'
+import { checkManualPrices, manualProductInputSchema } from '../../../../shared/schemas'
 import { resolveAsinInput } from '../../../services/intake'
 import { addManualProduct } from '../../../services/manual-products'
 import { withRun } from '../../../services/runs'
@@ -10,7 +10,7 @@ import { createCopywriter } from '../../../services/copywriter'
 export default defineEventHandler(async (event) => {
   const db = useDb()
   const themeId = requireParam(event, 'id')
-  const input = await readValidated(event, manualProductInputSchema.omit({ themeId: true }))
+  const input = await readValidated(event, manualProductInputSchema.omit({ themeId: true }).superRefine(checkManualPrices))
   const theme = (await getTheme(db, themeId)) ?? notFound('Temática')
   if (theme.provider !== 'manual') {
     throw createError({ statusCode: 400, message: 'La temática no usa la fuente «Alta manual»' })
@@ -29,6 +29,8 @@ export default defineEventHandler(async (event) => {
     brand: input.brand,
     note: input.note,
     priceCents: input.priceCents,
+    basisPriceCents: input.basisPriceCents,
+    basisType: input.basisPriceCents != null ? input.basisType : null,
   })
   const { result, runId } = await withRun(db, 'scan', 'manual', themeId, (log) =>
     scanTheme(db, theme, log, { timezone: useTimezone(), copywriter: createCopywriter(useEnv()) }),
