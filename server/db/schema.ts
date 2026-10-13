@@ -52,6 +52,8 @@ export const themes = sqliteTable('themes', {
     .default(sql`'[]'`),
   dedupeDays: integer('dedupe_days').notNull().default(14),
   tone: text('tone').notNull().default(''),
+  /** Emoji del título de los mensajes ({{emoji}}); vacío = 🛍️. */
+  emoji: text('emoji').notNull().default(''),
   createdAt: timestamp('created_at').notNull().default(now),
   updatedAt: timestamp('updated_at').notNull().default(now),
 })

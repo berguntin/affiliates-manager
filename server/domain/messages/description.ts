@@ -28,6 +28,8 @@ export const DESCRIPTION_SYSTEM_PROMPT = `Redactas el comentario personal de un 
 
 Recibes las notas rápidas de quien recomienda el producto (por qué le gusta, para quién es, cómo lo usa). Tu trabajo es convertirlas en un texto natural de 2 a 4 frases (máximo ${DESCRIPTION_MAX} caracteres) en el tono de la temática.
 
+Termina con una frase que diga para quién es o en qué situación encaja (por ejemplo «Una opción muy práctica si viajáis a menudo con el peque»), siempre que se deduzca de las notas. Si no se deduce, no la inventes.
+
 Reglas obligatorias (las impone la licencia de Afiliados de Amazon):
 - Cuenta solo lo que dicen las notas. No añadas características, materiales, medidas, prestaciones ni opiniones que no estén en ellas, y no uses la descripción de Amazon.
 - No repitas ni parafrasees el título del producto: va en la ficha, debajo.

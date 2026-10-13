@@ -28,6 +28,7 @@ function defaults(): ThemeData {
     publishWindows: [],
     dedupeDays: 14,
     tone: '',
+    emoji: '',
     channelIds: [],
   }
 }
@@ -203,6 +204,9 @@ async function remove() {
               placeholder="Elige canales"
               class="w-full"
             />
+          </UFormField>
+          <UFormField label="Emoji del título" name="emoji" help="Va delante del título en los mensajes ({{emoji}}). Vacío: 🛍️.">
+            <UInput v-model="state.emoji" placeholder="🍼" class="w-24" />
           </UFormField>
           <UFormField
             label="Tono del mensaje"

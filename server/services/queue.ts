@@ -290,7 +290,7 @@ export async function acceptReview(db: Db, id: string, ctx: QueueContext) {
   const rendered = renderMessage(
     format,
     await resolveTemplate(db, theme.id, format),
-    messageDataFrom(fresh, evaluation, ctx.timezone, item.intro, channel.legalUrl),
+    messageDataFrom(fresh, evaluation, ctx.timezone, item.intro, channel.legalUrl, theme.emoji),
   )
   await setStatus(db, id, item.status, {
     text: rendered.text,

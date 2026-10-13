@@ -43,6 +43,8 @@ export const themeInputSchema = z
     publishWindows: z.array(publishWindowSchema).max(10).default([]),
     dedupeDays: z.number().int().min(0).max(365).default(14),
     tone: z.string().trim().max(300).default(''),
+    /** Uno o dos emojis para el título (p. ej. 🍼). */
+    emoji: z.string().trim().max(16, 'Pon uno o dos emojis').default(''),
     channelIds: z.array(z.string().min(1)).max(50).default([]),
   })
   .refine(

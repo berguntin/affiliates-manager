@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       ? { priceCents: 17990, savingBasisCents: 22900, basisIsListPrice: false, discountPct: 21, dealBadge: null, checkedAt: Date.now() }
       : null,
     legalUrl: legalChannel?.legalUrl ?? null,
+    emoji: '🍼',
   })
   return { ...rendered, legalChannel: legalChannel?.name ?? null }
 })

@@ -67,9 +67,12 @@ describe('renderMessage', () => {
     const { text, warnings } = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice)
     expect(warnings).toEqual([])
     expect(text).toContain('<b>Pañales &lt;talla 3&gt; &amp; más</b>')
-    expect(text).toContain(`🔻 <b>-33%</b> (antes ${eur('29,99')})`)
     expect(text).toContain(
-      `💶 Precio: <b>${eur('19,99')}</b> (consultado el 12/10/2026 a las 14:11, hora peninsular)`,
+      [
+        `💰 Antes: ${eur('29,99')}`,
+        `🔥 Ahora: <b>${eur('19,99')}</b> (consultado el 12/10/2026 a las 14:11, hora peninsular)`,
+        '💸 Ahorro del 33%',
+      ].join('\n'),
     )
     expect(text.endsWith('ℹ️ Enlace de afiliado · precio sujeto a cambios')).toBe(true)
     expect(text).not.toContain('En calidad de Afiliado')
@@ -83,7 +86,8 @@ describe('renderMessage', () => {
     expect(text).toContain(`💶 ${LEGAL.noPrice}`)
     expect(text).toContain('Ideal para la canastilla')
     expect(text).not.toContain(LEGAL.shortPrice)
-    expect(text).not.toContain('🔻')
+    expect(text).not.toContain('💸')
+    expect(text).toContain('Ideal para la canastilla\n\n💶')
     expect(text.endsWith('ℹ️ Enlace de afiliado')).toBe(true)
     expect(checkRequiredElements(text, { link, withPrice: false })).toEqual([])
   })
@@ -102,8 +106,8 @@ describe('renderMessage', () => {
   it('rotula el PVP recomendado como tal y no como «antes»', () => {
     const list = { ...withPrice, price: { ...withPrice.price!, basisIsListPrice: true } }
     const { text } = renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, list)
-    expect(text).toContain(`(PVP rec. ${eur('29,99')})`)
-    expect(text).not.toContain('antes')
+    expect(text).toContain(`💰 PVP recomendado: ${eur('29,99')}`)
+    expect(text).not.toContain('Antes')
   })
 
   it('añade bloque de precio y enlace aunque la plantilla los omita', () => {
@@ -113,11 +117,23 @@ describe('renderMessage', () => {
     expect(warnings).toContain('La plantilla no incluye {{enlace}}: se ha añadido al final')
   })
 
-  it('pone la entradilla escapada antes de la ficha y la omite si no hay', () => {
-    const intro = { ...withPrice, intro: '¡Atentos <familias>!' }
+  it('pone la entradilla escapada tras el título y usa el emoji de la temática', () => {
+    const intro = { ...withPrice, intro: '¡Atentos <familias>!', emoji: '🍼' }
     const { text } = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], intro)
-    expect(text.startsWith('¡Atentos &lt;familias&gt;!\n\n🛍️ <b>')).toBe(true)
-    expect(renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice).text.startsWith('🛍️')).toBe(true)
+    expect(text.startsWith('🍼 <b>Pañales &lt;talla 3&gt; &amp; más</b>\n🏷️ Dodot\n\n¡Atentos &lt;familias&gt;!\n\n💰')).toBe(true)
+    expect(renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice).text).toMatch(/^🛍️ <b>.*<\/b>\n🏷️ Dodot\n\n💰/)
+  })
+
+  it('una plantilla con {{precio}} necesita {{consultado}}; si no, se añade el bloque de precio', () => {
+    const own = renderMessage('whatsapp', '{{titulo}} {{#precio}}{{precio}} ({{consultado}}){{/precio}} {{enlace}}', withPrice)
+    expect(own.warnings).toEqual([])
+    expect(own.text).not.toContain('💶')
+    const missing = renderMessage('whatsapp', '{{titulo}} {{precio}} {{enlace}}', withPrice)
+    expect(missing.warnings).toContain('La plantilla usa {{precio}} sin {{consultado}}: se ha añadido el bloque de precio al final')
+    expect(checkRequiredElements(missing.text, { link, withPrice: true })).toEqual([])
+    // Sin precio, la sección {{^precio}} de la plantilla sustituye a «Consulta el precio…» del sistema.
+    const noPrice = renderMessage('whatsapp', '{{titulo}} {{^precio}}Míralo en Amazon{{/precio}} {{enlace}}', manual)
+    expect(noPrice.text).not.toContain(LEGAL.noPrice)
   })
 
   it('añade la entradilla al principio en plantillas que no la incluyen', () => {

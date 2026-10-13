@@ -24,7 +24,13 @@ export const TEMPLATE_VARIABLES = [
   'pvp_recomendado',
   'oferta_flash',
   'bloque_precio',
+  'precio',
+  'consultado',
+  'emoji',
 ] as const
+
+/** Emoji del título si la temática no define uno. */
+export const DEFAULT_EMOJI = '🛍️'
 
 export const FORMAT_LIMITS: Record<MessageFormat, number> = {
   'telegram-html': 4096,
@@ -52,6 +58,8 @@ export interface MessageData {
     checkedAt: number
   } | null
   timezone: string
+  /** Emoji de la temática para el título ({{emoji}}). */
+  emoji?: string | null
   /** Opcional: la línea de avisos enlaza aquí (p. ej. el mensaje fijado del canal). */
   legalUrl?: string | null
 }
@@ -144,6 +152,10 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
     precio_anterior: basis && !data.price?.basisIsListPrice ? formatEuros(basis) : null,
     pvp_recomendado: basis && data.price?.basisIsListPrice ? formatEuros(basis) : null,
     oferta_flash: data.price?.dealBadge ?? null,
+    // Precio por piezas para plantillas con su propia línea («🔥 Ahora: {{precio}} ({{consultado}})»)
+    precio: data.price ? formatEuros(data.price.priceCents) : null,
+    consultado: data.price ? `consultado el ${formatCheckedAt(data.price.checkedAt, data.timezone)}` : null,
+    emoji: data.emoji?.trim() || DEFAULT_EMOJI,
   }
 
   // El bloque de precio ya viene formateado: se inserta tras renderizar.
@@ -153,7 +165,15 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
   if (data.intro && !/\{\{[#^]?entradilla\}\}/.test(template)) {
     body = `${rules.escape(data.intro)}\n\n${body}`
   }
-  body = body.includes(PLACEHOLDER) ? body.replace(PLACEHOLDER, block) : `${body.trimEnd()}\n\n${block}`
+  if (body.includes(PLACEHOLDER)) {
+    body = body.replace(PLACEHOLDER, block)
+  } else if (!ownPriceLineCovers(template, data)) {
+    // La fecha y hora de consulta (o «consulta el precio») nunca puede faltar.
+    if (data.price && /\{\{precio\}\}/.test(template)) {
+      warnings.push('La plantilla usa {{precio}} sin {{consultado}}: se ha añadido el bloque de precio al final')
+    }
+    body = `${body.trimEnd()}\n\n${block}`
+  }
 
   const escapedLink = rules.escape(data.link)
   if (!body.includes(escapedLink)) {
@@ -166,6 +186,16 @@ export function renderMessage(format: MessageFormat, template: string, data: Mes
     warnings.push(`El mensaje supera ${FORMAT_LIMITS[format]} caracteres`)
   }
   return { format, text, length: text.length, warnings }
+}
+
+/**
+ * ¿La plantilla muestra el precio por su cuenta? Con precio, necesita {{precio}} y
+ * {{consultado}}; sin precio, una sección {{^precio}} (p. ej. «Consulta el precio…»).
+ */
+function ownPriceLineCovers(template: string, data: MessageData): boolean {
+  return data.price
+    ? /\{\{precio\}\}/.test(template) && /\{\{consultado\}\}/.test(template)
+    : /\{\{\^precio\}\}/.test(template)
 }
 
 /** Comprueba que un texto (p. ej. editado a mano) mantiene los elementos obligatorios. */
