@@ -24,12 +24,35 @@ describe('texto propio redactado con IA', () => {
     ['a'.repeat(DESCRIPTION_MAX + 1), `más de ${DESCRIPTION_MAX} caracteres`],
     ['Míralo en www.amazon.es', 'contiene un enlace'],
     ['Lo **recomendamos** mucho', 'contiene formato o hashtags'],
-    ['Ahora un 30% menos', 'contiene precios o porcentajes'],
+    ['Ahora a 9,99 €', 'contiene precios'],
+    ['Ahora un 30% menos', 'contiene un porcentaje que no está en las notas (30%)'],
     ['Pesa solo 5 kilos', 'contiene una cifra que no está en las notas (5)'],
     ['Y con envío rápido a casa', 'menciona «envío»'],
     ['Un cochecito de bebé plegable que lo cambia todo', 'repite el título'],
   ])('rechaza %j (%s)', (raw, reason) => {
     expect(validateDescription(raw, input)).toEqual({ ok: false, reason })
+  })
+
+  it('acepta los porcentajes de las notas (composición) pero no como descuento', () => {
+    const notes = 'camiseta 100% algodón, las toallitas son 99,9% agua, ahora un 20% menos'
+    expect(validateDescription('Es 100% algodón y las toallitas, 99,9 % agua. Suavísimas.', { ...input, notes })).toEqual({
+      ok: true,
+      text: 'Es 100% algodón y las toallitas, 99,9 % agua. Suavísimas.',
+    })
+    expect(validateDescription('Las toallitas son 99.9% agua', { ...input, notes }).ok).toBe(true)
+    expect(validateDescription('Un 50% de algodón', { ...input, notes })).toEqual({
+      ok: false,
+      reason: 'contiene un porcentaje que no está en las notas (50%)',
+    })
+    const composition = 'camiseta 100% algodón'
+    expect(validateDescription('Ahora con un -100% de suavidad', { ...input, notes: composition })).toEqual({
+      ok: false,
+      reason: 'usa un porcentaje como descuento',
+    })
+    expect(validateDescription('Ahora un 100% menos de arrugas', { ...input, notes: composition })).toEqual({
+      ok: false,
+      reason: 'usa un porcentaje como descuento',
+    })
   })
 
   it('permite lo que ya está en las notas del usuario', () => {

@@ -33,7 +33,8 @@ Termina con una frase que diga para quién es o en qué situación encaja (por e
 Reglas obligatorias (las impone la licencia de Afiliados de Amazon):
 - Cuenta solo lo que dicen las notas. No añadas características, materiales, medidas, prestaciones ni opiniones que no estén en ellas, y no uses la descripción de Amazon.
 - No repitas ni parafrasees el título del producto: va en la ficha, debajo.
-- No menciones precios, descuentos, porcentajes ni comparaciones de precio («mínimo histórico», «nunca ha estado tan barato»…). Solo puedes usar cifras que aparezcan en las notas.
+- No menciones precios, descuentos ni comparaciones de precio («mínimo histórico», «nunca ha estado tan barato»…).
+- Solo puedes usar cifras y porcentajes que aparezcan en las notas, tal cual (p. ej. «100% algodón», «99,9% agua»). Nunca uses un porcentaje para hablar de descuento o ahorro.
 - No prometas envío, stock, regalos ni plazos.
 - Sin enlaces, sin hashtags, sin HTML ni Markdown. Como mucho un emoji.
 - Si las notas son muy escuetas, escribe un texto corto; no rellenes inventando.
@@ -70,11 +71,15 @@ export function validateDescription(raw: string, input: Pick<DescriptionInput, '
   if (text.length > DESCRIPTION_MAX) return { ok: false, reason: `más de ${DESCRIPTION_MAX} caracteres` }
   if (/https?:\/\/|www\.|\.(?:es|com)\b/i.test(text)) return { ok: false, reason: 'contiene un enlace' }
   if (/[<>*_`#[\]]/.test(text)) return { ok: false, reason: 'contiene formato o hashtags' }
-  if (/€|%/.test(text)) return { ok: false, reason: 'contiene precios o porcentajes' }
+  if (/€/.test(text)) return { ok: false, reason: 'contiene precios' }
 
   const notes = normalize(input.notes)
-  const notesNumbers = new Set(notes.match(/\d+(?:[.,]\d+)?/g) ?? [])
-  const invented = (text.match(/\d+(?:[.,]\d+)?/g) ?? []).find((n) => !notesNumbers.has(n))
+  const percentCheck = checkPercentages(normalize(text), notes)
+  if (percentCheck) return { ok: false, reason: percentCheck }
+
+  // «99,9» y «99.9» son la misma cifra
+  const notesNumbers = new Set((notes.match(/\d+(?:[.,]\d+)?/g) ?? []).map(decimalKey))
+  const invented = (text.match(/\d+(?:[.,]\d+)?/g) ?? []).find((n) => !notesNumbers.has(decimalKey(n)))
   if (invented) return { ok: false, reason: `contiene una cifra que no está en las notas (${invented})` }
 
   const plain = normalize(text)
@@ -83,4 +88,23 @@ export function validateDescription(raw: string, input: Pick<DescriptionInput, '
 
   if (repeatsTitle(plain, normalize(input.title), notes)) return { ok: false, reason: 'repite el título' }
   return { ok: true, text }
+}
+
+const decimalKey = (value: string) => value.replace(',', '.')
+
+const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/g
+/** Formas de anunciar un descuento con porcentaje: «-30%», «30% menos», «30% de dto.». */
+const DISCOUNT_PERCENT = /[-−]\s*\d+(?:[.,]\d+)?\s*%|%\s*(?:menos|mas barat[oa]s?|de dto|dto|de ahorro|off)\b/
+
+/**
+ * Los porcentajes solo valen si están en las notas (composición, «100% algodón»,
+ * «99,9% agua»…) y nunca anunciando un descuento, salvo que lo escribiera el usuario.
+ * Recibe los textos ya normalizados. Devuelve el motivo del rechazo o null.
+ */
+function checkPercentages(text: string, notes: string): string | null {
+  const fromNotes = new Set([...notes.matchAll(PERCENT)].map((m) => decimalKey(m[1]!)))
+  const invented = [...text.matchAll(PERCENT)].find((m) => !fromNotes.has(decimalKey(m[1]!)))
+  if (invented) return `contiene un porcentaje que no está en las notas (${invented[1]}%)`
+  if (DISCOUNT_PERCENT.test(text) && !DISCOUNT_PERCENT.test(notes)) return 'usa un porcentaje como descuento'
+  return null
 }
