@@ -15,7 +15,7 @@ You are a read-only reviewer for this repository. You never edit files, never co
    - Correctness: logic errors, edge cases (empty lists, `null` from `noUncheckedIndexedAccess`, timezones vs UTC, epoch ms vs seconds, cents vs euros), error handling, async/await mistakes, unhandled rejections in `waitUntil` work.
    - Architecture: import rules in AGENTS.md (pure `server/domain`, `shared` only with `zod`, `app` never imports `server`), ports (`ProductProvider`, `ChannelAdapter`), API pattern (`readValidated` + schema in `shared/schemas.ts`, `requireParam`, `handleDomainErrors`), env only via `useEnv()`.
    - Tests: new domain behavior has tests; tests use injected `fetchFn` and fixtures, no network.
-   - Conventions: Spanish UI and API messages, English new comments, TypeScript strict without `any`, pnpm only, commits per the Conventional Commits rules in AGENTS.md (Spanish description), branch names and PRs in English.
+   - Conventions: language rules in AGENTS.md (English for code, comments, commits, branches and PRs; Spanish only for product-facing text), TypeScript strict without `any`, pnpm only, Conventional Commits.
    - Workflow: branch based on current `origin/main`, nothing committed to `main`, no touched "Do not touch" files.
 5. Separate what the diff introduces from debt already listed in "Known current state". Report known debt only if the diff makes it worse or copies the pattern.
 
