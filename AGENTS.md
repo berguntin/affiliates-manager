@@ -122,7 +122,14 @@ Patterns:
 
 ## Workflow
 
-- Every task starts from an up-to-date `main`: `git fetch origin` and branch from `origin/main`. If `main` moves, merge it into your branch before opening or updating the PR (no rebase/force push on shared branches without the owner's OK).
+- Every task starts from an up-to-date local `main`, always with exactly these steps:
+  ```bash
+  git switch main
+  git pull --ff-only           # fetch + fast-forward local main to origin/main
+  git switch -c <branch-name>  # branch from local main
+  ```
+  Do not create the branch from `origin/main` (`git switch -c <branch> origin/main` makes the new branch track `main`, and a later `git push` fails or targets the wrong branch). If `git pull --ff-only` fails because local `main` has diverged, stop and ask the owner. The first push sets the branch's own upstream: `git push -u origin <branch-name>`.
+- If `main` moves, merge it into your branch before opening or updating the PR (no rebase/force push on shared branches without the owner's OK).
 - Changes reach `main` only through a pull request; never commit or push directly to `main`. One branch per task, named `<type>/<short-kebab-desc>` (e.g. `feat/extraccion-precios-amazon`).
 - Commits follow the repo style: Conventional Commits with a Spanish scope and summary, e.g. `feat(buzón): …`, `fix(cola): …`, `docs: …`.
 - PR description: what changed, how it was validated, and "Deploy steps" if a secret or migration is needed.
