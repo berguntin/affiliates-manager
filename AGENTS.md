@@ -65,7 +65,6 @@ Patterns:
 ## Product rules
 
 - One Amazon tracking ID per channel; links are built in `server/domain/affiliate.ts` and are never rewritten elsewhere.
-- Every rendered message ends with the short disclosure line (`ℹ️ Enlace de afiliado · precio sujeto a cambios`, or `ℹ️ Enlace de afiliado` without price). Any shown price carries the date and time it was checked. The renderer adds both outside the editable template (SPEC §14.10); never make them removable.
 - No image storage: messages carry the Amazon link and each network builds the preview (SPEC §14.3).
 - Candidates expire after 24 h. API-sourced product data (`mock`/`creators_api`) that was not published is purged by `queue:tick` after 24 h (SPEC §14.2); no own price history table.
 - Before publishing, the price is refreshed; if it changed, the publication goes to review and is not published.
@@ -78,7 +77,7 @@ Patterns:
 
 ### Amazon compliance and message rendering
 `server/domain/messages/**`, `server/domain/affiliate.ts`, `server/domain/deals.ts`, `server/services/templates.ts`, `server/services/product-lookup.ts`, `server/domain/amazon-page.ts`.
-- Change only with tests in `tests/domain/messages.test.ts`, `affiliate.test.ts`, `deals.test.ts`, `amazon-page.test.ts`: assert that the disclosure line, the price timestamp and the tracking ID survive every template and format, and that Telegram HTML is escaped.
+- Change only with tests in `tests/domain/messages.test.ts`, `affiliate.test.ts`, `deals.test.ts`, `amazon-page.test.ts`: assert that the price timestamp and the tracking ID survive every template and format, and that Telegram HTML is escaped.
 - Check the relevant rule in `docs/creators-api.md` and SPEC §13–14 before changing behavior; a rule change needs a SPEC §14 entry written by the owner.
 
 ### AI copy
@@ -147,6 +146,7 @@ Patterns:
 - `pnpm-lock.yaml` except via pnpm.
 - The D1 `database_id` in `wrangler.jsonc`.
 - New env variable: add it to `AppEnv` (`server/utils/env.ts`), `.dev.vars.example` (commented, fake value) and the README env table; never add a real value anywhere in the repo.
+- A test with the intention of making it pass, allways ask user for permission before modify an existing test.
 
 ## Known current state
 
