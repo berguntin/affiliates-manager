@@ -115,7 +115,10 @@ Patterns:
 
 - TypeScript strict; no `any`, no `@ts-ignore`/`@ts-expect-error` without a comment explaining why. Validate external input (request bodies, Telegram updates, provider responses) with zod or explicit checks.
 - Business logic goes in `server/domain` with Vitest tests; new domain behavior ships with tests. Tests use fixtures (`tests/domain/fixtures.ts`) and injected `fetchFn`, never real network.
-- Language: UI text, API error messages, commit messages and docs in Spanish (Spain). Identifiers, branch names and pull requests (title and description) in English. **New code comments in English**; do not rewrite existing Spanish comments just to translate them.
+- Language:
+  - **English for everything about code and workflow:** identifiers, code comments, commit messages (header, body, footers), branch names, pull requests (title, description, review comments), issues, CI config, and technical docs written for developers or agents.
+  - **Spanish (Spain) only for product-facing text:** panel UI, API error messages shown in the panel, Telegram/WhatsApp message content and templates, bot replies, and the AI prompts and validators that produce Spanish copy.
+  - Existing Spanish comments and docs (`README.md`, `SPEC.md`, `docs/`) are not translated just for the sake of it; text you add or rewrite in code follows the rule above.
 - Panel is mobile-first: check new screens at phone width; use Nuxt UI components; icons from `@iconify-json/lucide` (`i-lucide-*`), bundled (no runtime Iconify calls). Give icon-only buttons an accessible label.
 - Follow existing formatting (2 spaces, single quotes, no semicolons). There is no linter or formatter configured.
 
@@ -133,10 +136,10 @@ Patterns:
 - Commits follow the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) spec:
   - Header `<type>(<optional scope>)<optional !>: <description>`, lowercase type, imperative description, no trailing period, ideally ≤ 72 characters.
   - Types: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `style`, `revert`.
-  - Scope is the area touched (e.g. `buzón`, `cola`, `mensajes`, `ia`, `db`).
+  - Scope is the area touched, in English (e.g. `intake`, `queue`, `messages`, `ai`, `db`, `auth`, `panel`).
   - Breaking changes: `!` after type/scope and a `BREAKING CHANGE: <explanation>` footer.
   - Body (optional) after a blank line explains why; footers after another blank line.
-  - Description and body in Spanish, e.g. `fix(cola): no programar más allá de la caducidad`.
+  - Everything in English, e.g. `fix(queue): do not schedule past the candidate expiry`. Older Spanish commits predate this rule.
 - Pull requests in English. The PR title follows the same Conventional Commits header format (e.g. `docs(agents): add AGENTS.md, verify skill and reviewers`). The description covers what changed, how it was validated, and "Deploy steps" if a secret or migration is needed.
 
 ## Do not touch
