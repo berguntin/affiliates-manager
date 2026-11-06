@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   featureBullets,
@@ -67,6 +68,96 @@ describe('parseProductPage', () => {
   it('sin bloque de precio, usa priceAmount de los datos de la página', () => {
     const html = `<span id="productTitle">Cuna</span><script>{"priceAmount":1234.5,"currencySymbol":"€"}</script>`
     expect(parseProductPage(html)).toMatchObject({ title: 'Cuna', priceCents: 123450, features: [] })
+  })
+})
+
+/** Price block of real amazon.es product pages, trimmed (tests/fixtures/amazon-page). */
+function fixture(name: string): string {
+  return readFileSync(new URL(`../fixtures/amazon-page/${name}.html`, import.meta.url), 'utf8')
+}
+
+describe('parseProductPage with real amazon.es pages', () => {
+  it('reads a deal with «Precio recomendado» (empty a-offscreen in the price to pay)', () => {
+    expect(parseProductPage(fixture('list-price'))).toMatchObject({
+      title: 'Auriculares de diadema de prueba',
+      priceCents: 2299,
+      basisPriceCents: 2599,
+      basisType: 'LIST_PRICE',
+    })
+  })
+
+  it('with «Precio recomendado» and «El precio más bajo de los últimos 30 días», takes the first one (the discount reference)', () => {
+    expect(parseProductPage(fixture('list-price-and-lowest-30-days'))).toMatchObject({
+      priceCents: 2346,
+      basisPriceCents: 4999,
+      basisType: 'LIST_PRICE',
+    })
+  })
+
+  it('when the first struck-through price is not higher, takes the 30-day lowest price as WAS_PRICE', () => {
+    const html = fixture('list-price-and-lowest-30-days').replaceAll('49,99', '19,99')
+    expect(parseProductPage(html)).toMatchObject({ priceCents: 2346, basisPriceCents: 2469, basisType: 'WAS_PRICE' })
+  })
+
+  it('«Precio más bajo reciente» is a WAS_PRICE', () => {
+    const html = fixture('list-price').replaceAll('Precio recomendado:', 'Precio más bajo reciente:')
+    expect(parseProductPage(html)).toMatchObject({ priceCents: 2299, basisPriceCents: 2599, basisType: 'WAS_PRICE' })
+  })
+
+  it('without a struck-through price, reads only the price', () => {
+    expect(parseProductPage(fixture('no-basis'))).toMatchObject({
+      priceCents: 2498,
+      basisPriceCents: null,
+      basisType: null,
+    })
+  })
+
+  it('reads a price with a thousands separator', () => {
+    const html = fixture('no-basis').replace('<span class="a-price-whole">24<', '<span class="a-price-whole">1.299<')
+    expect(parseProductPage(html).priceCents).toBe(129998)
+  })
+
+  it('product without an available offer: no price', () => {
+    expect(parseProductPage(fixture('unavailable'))).toMatchObject({
+      title: 'Auriculares agotados de prueba',
+      priceCents: null,
+      basisPriceCents: null,
+    })
+  })
+
+  it('without the price-to-pay element, uses the accessibility text of the price block', () => {
+    const html = fixture('list-price').replace(/<span class="a-price aok-align-center[^"]*priceToPay[\s\S]*?<\/span><\/span><\/span>/, '')
+    expect(html).not.toContain('priceToPay apex-pricetopay-value')
+    expect(parseProductPage(html)).toMatchObject({ priceCents: 2299, basisPriceCents: 2599 })
+  })
+
+  it('in buying options data, uses the new offer price, not the used one', () => {
+    const html = `<span id="productTitle">Auriculares</span><div class="twister-plus-buying-options-price-data">{"desktop_buybox_group_1":[{"priceAmount":13.77,"buyingOptionType":"USED"},{"priceAmount":22.99,"buyingOptionType":"NEW"}]}</div>`
+    expect(parseProductPage(html).priceCents).toBe(2299)
+  })
+
+  it.each([
+    ['P.V.P.:', 'LIST_PRICE'],
+    ['Precio anterior:', 'WAS_PRICE'],
+    ['', 'LIST_PRICE'],
+  ])('classifies the reference label %j as %s (unknown labels are not a previous price)', (label, type) => {
+    const html = fixture('list-price').replaceAll('Precio recomendado:', label)
+    expect(parseProductPage(html)).toMatchObject({ basisPriceCents: 2599, basisType: type })
+  })
+
+  it('reads the label from a sibling element before the struck-through price', () => {
+    const html = `<span id="productTitle">Auriculares</span><div id="corePriceDisplay_desktop_feature_div"><span class="a-price priceToPay"><span class="a-offscreen">29,99€</span></span><div>Precio recomendado:</div><div><span class="a-price a-text-price" data-a-strike="true"><span class="a-offscreen">49,99€</span></span></div></div>`
+    expect(parseProductPage(html)).toMatchObject({ priceCents: 2999, basisPriceCents: 4999, basisType: 'LIST_PRICE' })
+  })
+
+  it('never takes the price of a used offer', () => {
+    const html = `<span id="productTitle">Auriculares</span><div class="twister-plus-buying-options-price-data">{"desktop_buybox_group_1":[{"priceAmount":13.77,"buyingOptionType":"USED"}]}</div>`
+    expect(parseProductPage(html).priceCents).toBeNull()
+  })
+
+  it('does not read the struck-through price when the price-to-pay element has no offscreen text', () => {
+    const html = fixture('list-price').replace('<span class="a-offscreen"> </span><span aria-hidden="true"><span class="a-price-whole">', '<span aria-hidden="true"><span class="a-price-whole">')
+    expect(parseProductPage(html)).toMatchObject({ priceCents: 2299, basisPriceCents: 2599 })
   })
 })
 
