@@ -63,6 +63,12 @@ describe('formatCheckedAt', () => {
 })
 
 describe('renderMessage', () => {
+  it('escapa el texto propio en Telegram y lo deja tal cual en WhatsApp', () => {
+    const data: MessageData = { ...manual, note: 'Me encanta <3 & más' }
+    expect(renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], data).text).toContain('Me encanta &lt;3 &amp; más')
+    expect(renderMessage('whatsapp', DEFAULT_TEMPLATES.whatsapp, data).text).toContain('Me encanta <3 & más')
+  })
+
   it('Telegram con precio: escapa HTML e incluye fecha y la línea breve de avisos', () => {
     const { text, warnings } = renderMessage('telegram-html', DEFAULT_TEMPLATES['telegram-html'], withPrice)
     expect(warnings).toEqual([])

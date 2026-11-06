@@ -118,7 +118,7 @@ export type DescriptionResult = { ok: true; text: string } | { ok: false; reason
 
 /**
  * «Texto propio» a partir de las notas del usuario (alta manual en el panel).
- * Una sola llamada; si falla o no pasa la validación, el usuario conserva sus notas.
+ * Single call; if it fails, comes back empty or is too long, the user keeps their notes.
  */
 export async function writeDescription(
   env: { ANTHROPIC_API_KEY?: string },
@@ -129,7 +129,7 @@ export async function writeDescription(
   try {
     const response = await complete(client, DESCRIPTION_SYSTEM_PROMPT, buildDescriptionUserMessage(input))
     if (!response.ok) return response
-    const check = validateDescription(response.text, input)
+    const check = validateDescription(response.text)
     return check.ok ? check : { ok: false, reason: `Texto descartado: ${check.reason}. Prueba de nuevo o ajusta las notas.` }
   } catch (error) {
     return { ok: false, reason: describeError(error) }
