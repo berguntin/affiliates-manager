@@ -83,34 +83,102 @@ const PRICE_SECTIONS = [
   'apex_desktop',
 ]
 
-function priceSection(html: string): string | null {
-  for (const id of PRICE_SECTIONS) {
-    const section = sectionFrom(html, id, 8000)
-    if (section) return section
+/**
+ * Price block from its id up to the next page widget (`data-feature-name`), so the search
+ * neither stops halfway through a long block nor reaches prices of other offers below it.
+ */
+function priceBlock(html: string, id: string): string | null {
+  const section = sectionFrom(html, id, 30_000)
+  if (!section) return null
+  const tagEnd = section.indexOf('>')
+  const next = section.slice(tagEnd + 1).search(/\bdata-feature-name=/)
+  return next === -1 ? section : section.slice(0, tagEnd + 1 + next)
+}
+
+function priceSections(html: string): string[] {
+  return PRICE_SECTIONS.map((id) => priceBlock(html, id)).filter((s): s is string => s != null)
+}
+
+const WHOLE_FRACTION = /a-price-whole["']>([\d.]+)[\s\S]*?a-price-fraction["']>(\d+)/
+
+/** Price of the `priceToPay` element: its offscreen text or, when empty (current layout), its whole and fraction parts. */
+function priceToPay(section: string): number | null {
+  const at = section.search(/<span\b[^>]*\bclass=["'][^"']*\b(?:priceToPay|apexPriceToPay)\b/)
+  if (at === -1) return null
+  // Stop before the struck-through price so its offscreen text is never read as the price
+  const element = section.slice(at, at + 1500).split(/a-text-price|data-a-strike/)[0]!
+  const offscreen = element.match(/<span class=["']a-offscreen["']>([^<]*)</)
+  const fromOffscreen = offscreen ? parseAmazonPrice(decodeEntities(offscreen[1]!)) : null
+  if (fromOffscreen != null) return fromOffscreen
+  const whole = element.match(WHOLE_FRACTION)
+  return whole ? parseAmazonPrice(`${whole[1]},${whole[2]}`) : null
+}
+
+/** Accessibility text of the price block: " 22,99 € con un ahorro del 12 % ". */
+function accessiblePrice(section: string): number | null {
+  const label = elementById(section, 'apex-pricetopay-accessibility-label')
+  const price = label ? textOf(label).match(/\d[\d.]*(?:,\d{1,2})?\s*€/) : null
+  return price ? parseAmazonPrice(price[0]) : null
+}
+
+/** Page data of the buying options: the price of the new (not used) offer. */
+function newOfferAmount(html: string): number | null {
+  const m = html.match(/\{[^{}]*"priceAmount"\s*:\s*(\d+(?:\.\d{1,2})?)[^{}]*"buyingOptionType"\s*:\s*"NEW"/)
+  return m ? Math.round(Number(m[1]) * 100) : null
+}
+
+function findPrice(html: string, sections: string[]): number | null {
+  for (const section of sections) {
+    const cents = priceToPay(section) ?? accessiblePrice(section)
+    if (cents != null) return cents
+  }
+  for (const section of sections) {
+    const whole = section.match(WHOLE_FRACTION)
+    if (whole) return parseAmazonPrice(`${whole[1]},${whole[2]}`)
+  }
+  const fromOffer = newOfferAmount(html)
+  if (fromOffer != null) return fromOffer
+  // Any other page data with a price, except offers that are not new (used, renewed…)
+  for (const data of html.matchAll(/\{[^{}]*"priceAmount"\s*:\s*(\d+(?:\.\d{1,2})?)[^{}]*\}/g)) {
+    if (!/"buyingOptionType"/.test(data[0])) return Math.round(Number(data[1]) * 100)
   }
   return null
 }
 
-function findPrice(html: string, section: string | null): number | null {
-  if (section) {
-    const toPay = section.match(/(?:priceToPay|apexPriceToPay)[\s\S]*?<span class=["']a-offscreen["']>([^<]+)</)
-    if (toPay) return parseAmazonPrice(decodeEntities(toPay[1]!))
-    const whole = section.match(/a-price-whole["']>([\d.]+)[\s\S]*?a-price-fraction["']>(\d+)/)
-    if (whole) return parseAmazonPrice(`${whole[1]},${whole[2]}`)
-  }
-  const amount = html.match(/"priceAmount"\s*:\s*(\d+(?:\.\d{1,2})?)/)
-  return amount ? Math.round(Number(amount[1]) * 100) : null
+/** Struck-through prices, in page order, whatever other classes the element has. */
+const STRIKE_PRICE =
+  /<span\b(?=[^>]*\bclass=["'][^"']*\ba-text-price\b)(?=[^>]*\bdata-a-strike=["']true["'])[^>]*>\s*<span class=["']a-offscreen["']>([^<]+)</g
+
+/**
+ * Type of reference price from its normalized label. An unknown label is not assumed to be a
+ * real previous price: the caller falls back to LIST_PRICE, the conservative choice.
+ */
+function basisTypeOf(label: string): ManualBasisType | null {
+  if (/recomendado|p\.?\s?v\.?\s?p\b/.test(label)) return 'LIST_PRICE'
+  if (/anterior|mas bajo|antes\b/.test(label)) return 'WAS_PRICE'
+  return null
 }
 
-function findBasis(section: string | null): { cents: number; type: ManualBasisType } | null {
-  if (!section) return null
-  const strike = section.match(/<span class=["']a-price a-text-price["'][^>]*data-a-strike=["']true["'][^>]*>\s*<span class=["']a-offscreen["']>([^<]+)</)
-  if (!strike) return null
-  const cents = parseAmazonPrice(decodeEntities(strike[1]!))
-  if (cents == null) return null
-  // La etiqueta va justo antes del precio tachado: «Precio recomendado:», «PVP:», «Precio anterior:»…
-  const label = normalize(textOf(section.slice(Math.max(0, strike.index! - 600), strike.index)))
-  return { cents, type: /recomendado|pvp/.test(label) ? 'LIST_PRICE' : 'WAS_PRICE' }
+/**
+ * Reference price shown by Amazon next to the price: the first struck-through price that is
+ * higher than the price (the one Amazon's discount refers to).
+ */
+function findBasis(sections: string[], priceCents: number | null): { cents: number; type: ManualBasisType } | null {
+  if (priceCents == null) return null
+  for (const section of sections) {
+    for (const strike of section.matchAll(STRIKE_PRICE)) {
+      const cents = parseAmazonPrice(decodeEntities(strike[1]!))
+      if (cents == null || cents <= priceCents) continue
+      // The label sits right before the price, inside the same row: «Precio recomendado:», «PVP:»,
+      // «Precio anterior:», «Precio más bajo reciente:», «El precio más bajo de los últimos 30 días:»…
+      const before = section.slice(Math.max(0, strike.index - 600), strike.index)
+      // Look in the price's own row first and, if no label is recognised there, in the whole window
+      const rowStart = before.lastIndexOf('</div>')
+      const row = normalize(textOf(rowStart === -1 ? before : before.slice(rowStart + '</div>'.length)))
+      return { cents, type: basisTypeOf(row) ?? basisTypeOf(normalize(textOf(before))) ?? 'LIST_PRICE' }
+    }
+  }
+  return null
 }
 
 function findBrand(html: string): string | null {
@@ -142,16 +210,15 @@ function findFeatures(html: string): string[] {
 
 export function parseProductPage(html: string): ProductPageData {
   const title = elementById(html, 'productTitle')
-  const section = priceSection(html)
-  const priceCents = findPrice(html, section)
-  const basis = findBasis(section)
-  const validBasis = basis && priceCents != null && basis.cents > priceCents ? basis : null
+  const sections = priceSections(html)
+  const priceCents = findPrice(html, sections)
+  const basis = findBasis(sections, priceCents)
   return {
     title: title ? truncate(textOf(title), 300) || null : null,
     brand: findBrand(html),
     priceCents,
-    basisPriceCents: validBasis?.cents ?? null,
-    basisType: validBasis?.type ?? null,
+    basisPriceCents: basis?.cents ?? null,
+    basisType: basis?.type ?? null,
     features: findFeatures(html),
   }
 }
