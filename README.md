@@ -250,7 +250,6 @@ WhatsApp genera la vista previa a partir del enlace.
 
 - Crea un **tracking ID distinto por canal** en Associates Central y da de alta cada canal como «Sitio».
 - **Pon en la descripción de cada canal los dos textos completos de Amazon**: el aviso de afiliado («En calidad de Afiliado de Amazon, obtengo ingresos por las compras adscritas que cumplen los requisitos aplicables.») y el descargo de precios (ver `docs/creators-api.md` §7). Los mensajes no los repiten (SPEC §14.10).
-- Cada mensaje acaba con «ℹ️ Enlace de afiliado · precio sujeto a cambios». Si llevan precio, incluyen también la fecha y hora de consulta. Opcional: en **Canales → Enlace para la línea de avisos** puedes enlazar esa línea a un mensaje fijado.
 
 ## Estructura
 
