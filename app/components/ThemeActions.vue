@@ -121,7 +121,7 @@ const { data: recent, refresh: refreshRecent } = await useFetch<
   { id: string; asin: string; title: string; createdAt: number; consumedAt: number | null }[]
 >(`/api/themes/${props.themeId}/manual-products`, { default: () => [] })
 
-// «Redactar con IA»: la IA amplía las notas; el original se guarda para poder deshacer.
+// «Redactar con IA»: the AI writes up the notes as the user asks; the original is kept for undo.
 const { run: runDescribe, pending: describing } = useApiAction()
 const notesBeforeAi = ref<string | null>(null)
 const canDescribe = computed(() => manual.title.trim().length >= 3 && notesWithoutBullets.value.length >= 3)

@@ -70,7 +70,8 @@ Patterns:
 - Before publishing, the price is refreshed; if it changed, the publication goes to review and is not published.
 - Manually typed prices may be published only under the validation mode of SPEC §14.7.
 - **Accepted exception (Amazon product page lookup):** `server/services/product-lookup.ts` reads the amazon.es product page (`lookupFromPage`) to prefill title, brand, prices and feature bullets in the manual add flow (panel `POST /api/products/lookup` and bot buzón), only when the Creators API is unavailable. The owner accepts this risk for the validation phase. Limits: only on explicit user action for one ASIN, the result is reviewed by a human before creating a candidate, never used by `scan`, `queue:tick` or any automatic flow, and it must be removed once the Creators API is available. Do not extend it (more fields, more call sites, crawling, retries to bypass blocks).
-- AI copy (`server/services/copywriter.ts`, prompts and validators in `server/domain/messages/intro.ts` and `description.ts`): the AI writes only our own text from the theme tone and the user's notes. It never describes or paraphrases Amazon content, never invents numbers, prices, shipping or "historic low" claims, and every output passes the validator before use; on failure the message falls back to the template. Max `MAX_INTROS_PER_RUN` calls per run.
+- AI copy (`server/services/copywriter.ts`, prompts and validators in `server/domain/messages/intro.ts` and `description.ts`): the AI never describes or paraphrases Amazon content on its own and never invents numbers, prices, shipping or "historic low" claims. The automatic intro (`intro.ts`) writes only from the theme tone, and every output passes its validator before use; on failure the message falls back to the template. Max `MAX_INTROS_PER_RUN` calls per run.
+- The manual "Redactar con IA" text (`description.ts`) writes whatever the user's notes say, without filtering their content (SPEC §14.9, amended 2026-11-06): the owner reviews it and is responsible for compliance when publishing. Its validator only checks empty output and `DESCRIPTION_MAX`. Do not add content filters back without the owner's decision.
 - WhatsApp stays assisted: no unofficial WhatsApp libraries.
 
 ## Risk areas
@@ -82,7 +83,7 @@ Patterns:
 
 ### AI copy
 `server/services/copywriter.ts`, `server/domain/messages/intro.ts`, `server/domain/messages/description.ts`.
-- Any prompt change keeps the validators in place; add cases to `tests/domain/intro.test.ts` / `description.test.ts` / `tests/services/copywriter.test.ts` with outputs that must be rejected.
+- Any intro prompt change keeps its validator in place; add cases to `tests/domain/intro.test.ts` / `tests/services/copywriter.test.ts` with outputs that must be rejected. The description validator only checks empty output and length (see Product rules); cover it in `tests/domain/description.test.ts`.
 - Keep the per-run limit and concurrency (each call is a Worker subrequest). Never send secrets or user emails to the model. Model id lives in `COPYWRITER_MODEL`.
 
 ### Auth, webhook and secrets
@@ -157,7 +158,7 @@ Debt where the code or docs do not yet match these rules. Do not assume these ar
 
 - The Amazon product page lookup (accepted exception above) is not yet recorded in SPEC §14, and SPEC §14.8, §14.9, README ("sin scraping") and `docs/arquitectura.md` §10 still say Amazon pages are never fetched. It sends a browser `User-Agent` instead of identifying itself as the intake resolver does (`INTAKE_USER_AGENT`).
 - Product data read from the Amazon page (title, prices, features) is stored in `intake_drafts` and in manual deals, which `queue:tick` never purges (the 24 h purge only covers `mock`/`creators_api` deals). `intake_drafts` rows, including Telegram user/chat IDs, are never deleted.
-- Feature bullets read from the Amazon page are inserted verbatim into the "texto propio" (`withFeatureBullets` in `server/services/intake.ts`, `featureBullets` in `server/domain/amazon-page.ts`), which SPEC §14.9 says must not contain Amazon content.
+- Feature bullets read from the Amazon page are inserted verbatim into the "texto propio" (`withFeatureBullets` in `server/services/intake.ts`, `featureBullets` in `server/domain/amazon-page.ts`), which the Amazon License (not modifying program content) forbids; SPEC §14.9 still states it.
 - `resolveShortLink` (`server/services/intake.ts`) follows up to 4 redirect hops to any non-Amazon host.
 - `docs/arquitectura.md` mentions `NUXT_AUTH_DISABLED` (the code reads `AUTH_DISABLED`), "repositorios" in `server/db/` (there are none; queries live in services), `fetchWithRetry` (the helper is `fetchJsonWithRetry`) and says tests cover only `server/domain`.
 - The README env table omits `INTAKE_BOT_TOKEN`, `INTAKE_WEBHOOK_SECRET`, `INTAKE_ALLOWED_USER_IDS` and `TELEGRAM_API_BASE` (they are in `AppEnv` and, except the last, in `.dev.vars.example`). `ANTHROPIC_API_KEY` is missing from `.dev.vars.example`.

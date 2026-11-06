@@ -1,15 +1,12 @@
 /**
  * «Texto propio» redactado por IA a partir de las notas del usuario (alta manual).
  *
- * La IA solo amplía y pule lo que el usuario ha escrito con su experiencia u opinión:
- * no describe el producto por su cuenta ni reescribe contenido de Amazon (lo prohíbe la
- * licencia de Afiliados, docs/creators-api.md §7). El precio, el enlace y los avisos los
- * pone el renderizador. El resultado se muestra en el formulario para revisarlo antes de
- * crear la candidata.
+ * The AI writes whatever the user's notes ask for, in the theme tone, without filtering
+ * their content: the owner reviews the text before creating the candidate and is the one
+ * responsible for Amazon compliance when publishing (SPEC §14.9, amended 2026-11-06).
+ * Price, link and legal notices are always added by the renderer. Only the length and
+ * an empty answer are checked here.
  */
-
-import { normalize } from '../text'
-import { FORBIDDEN, repeatsTitle } from './intro'
 
 /** Cabe en el campo «Texto propio» (máx. 500) con margen. */
 export const DESCRIPTION_MAX = 480
@@ -20,24 +17,19 @@ export interface DescriptionInput {
   brand: string | null
   themeName: string
   tone: string
-  /** Notas rápidas del usuario: lo único que la IA puede contar. */
+  /** User notes: the content the AI must write up. */
   notes: string
 }
 
 export const DESCRIPTION_SYSTEM_PROMPT = `Redactas el comentario personal de un mensaje de ofertas de Amazon para un canal de Telegram o WhatsApp, en español de España.
 
-Recibes las notas rápidas de quien recomienda el producto (por qué le gusta, para quién es, cómo lo usa). Tu trabajo es convertirlas en un texto natural de 2 a 4 frases (máximo ${DESCRIPTION_MAX} caracteres) en el tono de la temática.
+Recibes las notas de quien recomienda el producto. Tu trabajo es convertirlas en un texto natural y bien escrito (máximo ${DESCRIPTION_MAX} caracteres) en el tono de la temática.
 
-Termina con una frase que diga para quién es o en qué situación encaja (por ejemplo «Una opción muy práctica si viajáis a menudo con el peque»), siempre que se deduzca de las notas. Si no se deduce, no la inventes.
-
-Reglas obligatorias (las impone la licencia de Afiliados de Amazon):
-- Cuenta solo lo que dicen las notas. No añadas características, materiales, medidas, prestaciones ni opiniones que no estén en ellas, y no uses la descripción de Amazon.
-- No repitas ni parafrasees el título del producto: va en la ficha, debajo.
-- No menciones precios, descuentos ni comparaciones de precio («mínimo histórico», «nunca ha estado tan barato»…).
-- Solo puedes usar cifras y porcentajes que aparezcan en las notas, tal cual (p. ej. «100% algodón», «99,9% agua»). Nunca uses un porcentaje para hablar de descuento o ahorro.
-- No prometas envío, stock, regalos ni plazos.
-- Sin enlaces, sin hashtags, sin HTML ni Markdown. Como mucho un emoji.
-- Si las notas son muy escuetas, escribe un texto corto; no rellenes inventando.
+- Usa todo lo que digan las notas, tal como lo pide el usuario: cifras, porcentajes, precios, características, comparaciones, envío o cualquier otro dato. No lo rechaces, no lo suavices ni lo omitas, y no añadas advertencias ni comentarios sobre normas: quien publica revisa el texto y responde de él.
+- Si las notas incluyen indicaciones sobre cómo escribir el texto (longitud, estilo, qué destacar), síguelas.
+- No describas el producto por tu cuenta ni reescribas su título: todo el contenido sale de las notas, y no inventes datos que no estén en ellas.
+- Si se deduce de las notas, puedes terminar con una frase que diga para quién es o en qué situación encaja.
+- Escribe texto plano, sin HTML ni Markdown.
 
 Responde solo con el texto, sin comillas ni explicaciones.`
 
@@ -47,7 +39,7 @@ export function buildDescriptionUserMessage(input: DescriptionInput): string {
     `Temática del canal: ${input.themeName}`,
     `Tono: ${input.tone.trim() || 'cercano y natural'}`,
     '',
-    'Producto (solo como contexto; no lo describas ni lo repitas):',
+    'Producto (solo como contexto; no lo describas por tu cuenta):',
     `<titulo>${input.title}</titulo>`,
   ]
   if (input.brand) lines.push(`<marca>${input.brand}</marca>`)
@@ -57,8 +49,8 @@ export function buildDescriptionUserMessage(input: DescriptionInput): string {
 
 export type DescriptionCheck = { ok: true; text: string } | { ok: false; reason: string }
 
-/** Limpia y valida el texto. Si no pasa, el usuario conserva sus notas. */
-export function validateDescription(raw: string, input: Pick<DescriptionInput, 'title' | 'notes'>): DescriptionCheck {
+/** Cleans the text and only checks that it is not empty and fits in «Texto propio». */
+export function validateDescription(raw: string): DescriptionCheck {
   const text = raw
     .trim()
     .replace(/^["'«“”]+|["'»“”]+$/g, '')
@@ -69,42 +61,5 @@ export function validateDescription(raw: string, input: Pick<DescriptionInput, '
 
   if (!text) return { ok: false, reason: 'vacío' }
   if (text.length > DESCRIPTION_MAX) return { ok: false, reason: `más de ${DESCRIPTION_MAX} caracteres` }
-  if (/https?:\/\/|www\.|\.(?:es|com)\b/i.test(text)) return { ok: false, reason: 'contiene un enlace' }
-  if (/[<>*_`#[\]]/.test(text)) return { ok: false, reason: 'contiene formato o hashtags' }
-  if (/€/.test(text)) return { ok: false, reason: 'contiene precios' }
-
-  const notes = normalize(input.notes)
-  const percentCheck = checkPercentages(normalize(text), notes)
-  if (percentCheck) return { ok: false, reason: percentCheck }
-
-  // «99,9» y «99.9» son la misma cifra
-  const notesNumbers = new Set((notes.match(/\d+(?:[.,]\d+)?/g) ?? []).map(decimalKey))
-  const invented = (text.match(/\d+(?:[.,]\d+)?/g) ?? []).find((n) => !notesNumbers.has(decimalKey(n)))
-  if (invented) return { ok: false, reason: `contiene una cifra que no está en las notas (${invented})` }
-
-  const plain = normalize(text)
-  const forbidden = FORBIDDEN.find((f) => f.pattern.test(plain) && !f.pattern.test(notes))
-  if (forbidden) return { ok: false, reason: `menciona «${forbidden.label}»` }
-
-  if (repeatsTitle(plain, normalize(input.title), notes)) return { ok: false, reason: 'repite el título' }
   return { ok: true, text }
-}
-
-const decimalKey = (value: string) => value.replace(',', '.')
-
-const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/g
-/** Formas de anunciar un descuento con porcentaje: «-30%», «30% menos», «30% de dto.». */
-const DISCOUNT_PERCENT = /[-−]\s*\d+(?:[.,]\d+)?\s*%|%\s*(?:menos|mas barat[oa]s?|de dto|dto|de ahorro|off)\b/
-
-/**
- * Los porcentajes solo valen si están en las notas (composición, «100% algodón»,
- * «99,9% agua»…) y nunca anunciando un descuento, salvo que lo escribiera el usuario.
- * Recibe los textos ya normalizados. Devuelve el motivo del rechazo o null.
- */
-function checkPercentages(text: string, notes: string): string | null {
-  const fromNotes = new Set([...notes.matchAll(PERCENT)].map((m) => decimalKey(m[1]!)))
-  const invented = [...text.matchAll(PERCENT)].find((m) => !fromNotes.has(decimalKey(m[1]!)))
-  if (invented) return `contiene un porcentaje que no está en las notas (${invented[1]}%)`
-  if (DISCOUNT_PERCENT.test(text) && !DISCOUNT_PERCENT.test(notes)) return 'usa un porcentaje como descuento'
-  return null
 }

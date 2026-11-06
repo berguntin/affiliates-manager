@@ -17,7 +17,7 @@ Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, p
    - Evita repetir el mismo producto dentro de una ventana de días.
 2. **Prepara el mensaje** de cada canal con su propio tracking ID, plantillas por formato (HTML de Telegram o texto de WhatsApp) y la línea de avisos («ℹ️ Enlace de afiliado · precio sujeto a cambios»; los textos legales completos van en la descripción del canal).
    - Una **entradilla redactada con IA** (Claude) en el tono de la temática.
-   - Un **texto propio** que la IA amplía a partir de unas notas.
+   - Un **texto propio** que la IA redacta a partir de tus notas, sin filtrar lo que escribas (lo revisas tú antes de publicar).
 3. **Gestiona una cola** de candidatas: revisar, editar, aprobar, programar en el siguiente ciclo del cron, publicar o descartar. Las candidatas caducan a las 24 h.
 4. **Publica:**
    - en **Telegram**, automáticamente vía Bot API;
