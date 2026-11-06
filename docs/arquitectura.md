@@ -173,7 +173,6 @@ candidata/aprobada/programada ──(expires_at)──► caducada
 - El **bloque de precio y la línea de avisos no forman parte de la plantilla editable**: el renderizador los añade siempre, así que no se pueden borrar por error (SPEC §14.10).
   - Con precio: `Precio: 19,99 € (consultado el 12/10/2026 a las 14:11, hora peninsular)`.
   - Sin precio: `Consulta el precio actual en Amazon`.
-  - Siempre, al final: `ℹ️ Enlace de afiliado · precio sujeto a cambios` (sin precio, `ℹ️ Enlace de afiliado`). Si el canal tiene `legal_url`, la línea enlaza a esa página.
   - Los textos completos de Amazon van en la descripción de cada canal.
 - La plantilla por defecto sigue el esquema título con `{{emoji}}` de la temática → entradilla → texto propio → «💰 Antes / 🔥 Ahora / 💸 Ahorro» → enlace. Para escribir su propia línea de precio, una plantilla puede usar `{{precio}}` + `{{consultado}}` en lugar de `{{bloque_precio}}`, y `{{^precio}}…{{/precio}}` para el caso sin precio. Si falta `{{consultado}}`, el renderizador añade el bloque de precio estándar, porque la fecha y hora no pueden faltar.
 - El título se **trunca** (nunca se reescribe) a una longitud configurable. Se valida la longitud total frente a los límites de cada plataforma.
