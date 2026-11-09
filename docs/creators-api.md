@@ -1,7 +1,7 @@
 # Amazon Creators API y normas de Afiliados de amazon.es — notas de investigación
 
 > Fecha: 2026-10-12. Base para diseñar los proveedores de producto y la generación de mensajes.
-> **Nada de aquí se ha probado contra la API real** (no hay credenciales: hacen falta ventas, ver §1).
+> **Probado contra la API real solo el token** (spike del 2026-11-09, ver §10). Las operaciones de catálogo siguen sin probar: la cuenta aún no es elegible (§1).
 
 ## 0. Fuentes
 
@@ -187,3 +187,15 @@ Estas cláusulas **cambian requisitos de la spec**. Se citan en resumen; el text
   - el significado de `LOWEST_PRICE` en España;
   - que `customerReviews` no llega;
   - el formato de `detailPageURL`.
+
+## 10. Resultado del spike (2026-11-09) e implementación
+
+- **Token LwA 3.2: funciona** con cuerpo JSON en `https://api.amazon.co.uk/auth/o2/token` (`token_type: bearer`, `expires_in: 3600`).
+- **GetItems: `403 AccessDeniedException`, `reason: AssociateNotEligible`** (*"Your account does not currently meet the eligibility requirements."*). Credenciales válidas, pero sin las ventas cualificadas de §1.
+- Siguen pendientes de confirmar con datos reales: el significado de `LOWEST_PRICE` en España, que `customerReviews` no llega, el formato de `detailPageURL` y los nombres `searchResult` / `itemsResult` de la respuesta.
+- `CreatorsApiProvider` (`server/providers/creators/`) ya está implementado sobre la forma documentada en §5:
+  - el token se cachea **por isolate** (no en KV/D1) y las llamadas van en serie con ≥ 1,1 s entre ellas. Un escaneo y una consulta del panel en isolates distintos pueden superar 1 TPS de forma puntual: se acepta, porque los 429 se reintentan respetando `retryAfterSeconds` (con un máximo de 10 s). Si aparecen 429 en Ejecuciones, habrá que compartir el espaciado en D1/KV;
+  - máximo 10 SearchItems por temática y escaneo; GetItems en lotes de 10;
+  - el 403 se trata como `ProviderUnavailableError`, de modo que el panel y la consulta de producto vuelven al alta manual;
+  - la consulta de producto usa `CREATORS_PARTNER_TAG` (no hay canal). Con la API disponible, nunca lee la ficha: si falta el producto o hay un error, lo indica. Un precio con `violatesMAP` no se rellena.
+  - **Subrequests:** `scan:daily` procesa todas las temáticas en una invocación. Cada temática «Creators API» hace como mucho 10 SearchItems, más ⌈candidatas/10⌉ GetItems por canal y el token, y cada llamada admite hasta 3 reintentos. Con el plan Workers Free (50 subrequests por invocación) solo caben una o dos temáticas; con el plan de pago el margen es amplio. Si se añaden más temáticas, hará falta un presupuesto global de llamadas por invocación.

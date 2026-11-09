@@ -17,6 +17,11 @@ export interface AppEnv {
   /** Solo para pruebas locales: base alternativa de la Bot API. */
   TELEGRAM_API_BASE?: string
   ANTHROPIC_API_KEY?: string
+  /** Amazon Creators API (docs/creators-api.md §2), credential version 3.2. */
+  CREATORS_CREDENTIAL_ID?: string
+  CREATORS_CREDENTIAL_SECRET?: string
+  /** Store ID or tracking ID used when there is no channel tag (product lookup). */
+  CREATORS_PARTNER_TAG?: string
 }
 
 /**
@@ -29,6 +34,15 @@ export function useEnv(): AppEnv {
     throw createError({ statusCode: 500, message: 'Binding D1 "DB" no disponible' })
   }
   return env as AppEnv
+}
+
+/**
+ * Same bindings as useEnv, but never throws (outside the Worker, e.g. in tests, it is empty).
+ * Only for optional integrations that must degrade when unconfigured (the Creators API
+ * factory and product lookup); everything else uses useEnv so a missing binding fails loudly.
+ */
+export function useOptionalEnv(): Partial<AppEnv> {
+  return (globalThis as { __env__?: Partial<AppEnv> }).__env__ ?? {}
 }
 
 export function useTimezone(): string {

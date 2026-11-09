@@ -1,9 +1,12 @@
 import type { ManualBasisType } from '../../shared/types'
 import { MARKETPLACE_HOST } from '../domain/affiliate'
 import { isBlockedPage, parseProductPage } from '../domain/amazon-page'
-import { CreatorsApiProvider } from '../providers/creators/provider'
 import type { ProductProvider } from '../providers/types'
 import { ProviderUnavailableError } from '../providers/types'
+import { useOptionalEnv } from '../utils/env'
+import { HttpError } from '../utils/http'
+import { CreatorsApiError } from '../providers/creators/client'
+import { getCreatorsProvider } from './providers'
 
 export interface ProductLookup {
   asin: string
@@ -54,27 +57,37 @@ export async function lookupFromPage(asin: string, fetchFn: typeof fetch = fetch
   return { asin, source: 'amazon_page', ...parseProductPage(html) }
 }
 
-/** Datos de la Creators API (null si no está disponible: sin credenciales o sin acceso). */
-async function lookupFromApi(asin: string, provider: ProductProvider): Promise<ProductLookup | null> {
+/**
+ * Creators API data. null only when the API is unavailable (no credentials, 403); once
+ * it is available, a missing item or an API error never falls back to the page.
+ */
+async function lookupFromApi(asin: string, provider: ProductProvider, partnerTag: string): Promise<ProductLookup | null> {
+  let snapshot
   try {
-    const [snapshot] = await provider.refresh([asin], '')
-    if (!snapshot) return null
-    const offer = snapshot.offer
-    const basisType = offer?.savingBasisType === 'LIST_PRICE' || offer?.savingBasisType === 'WAS_PRICE' ? offer.savingBasisType : null
-    const validBasis = offer && basisType && offer.savingBasisCents != null && offer.savingBasisCents > offer.priceCents
-    return {
-      asin,
-      source: 'creators_api',
-      title: snapshot.title,
-      brand: snapshot.brand,
-      priceCents: offer?.priceCents ?? null,
-      basisPriceCents: validBasis ? offer.savingBasisCents : null,
-      basisType: validBasis ? basisType : null,
-      features: snapshot.features ?? [],
-    }
+    ;[snapshot] = await provider.refresh([asin], partnerTag)
   } catch (error) {
     if (error instanceof ProviderUnavailableError) return null
-    throw error
+    if (error instanceof CreatorsApiError || error instanceof HttpError) {
+      // Sanitized message (status and reason only)
+      throw new ProductLookupError(`No se ha podido consultar el producto en la Creators API (${error.message})`)
+    }
+    // Network error or timeout: generic message, no page fallback
+    throw new ProductLookupError('No se ha podido conectar con la Creators API; inténtalo de nuevo')
+  }
+  if (!snapshot) throw new ProductLookupError('Amazon no devuelve ese producto; rellena los datos a mano')
+  // A MAP-restricted price cannot be shown (docs/creators-api.md §5)
+  const offer = snapshot.offer && !snapshot.offer.violatesMap ? snapshot.offer : null
+  const basisType = offer?.savingBasisType === 'LIST_PRICE' || offer?.savingBasisType === 'WAS_PRICE' ? offer.savingBasisType : null
+  const validBasis = offer && basisType && offer.savingBasisCents != null && offer.savingBasisCents > offer.priceCents
+  return {
+    asin,
+    source: 'creators_api',
+    title: snapshot.title,
+    brand: snapshot.brand,
+    priceCents: offer?.priceCents ?? null,
+    basisPriceCents: validBasis ? offer.savingBasisCents : null,
+    basisType: validBasis ? basisType : null,
+    features: snapshot.features ?? [],
   }
 }
 
@@ -84,8 +97,10 @@ async function lookupFromApi(asin: string, provider: ProductProvider): Promise<P
  */
 export async function lookupProduct(
   asin: string,
-  opts: { fetchFn?: typeof fetch; api?: ProductProvider } = {},
+  opts: { fetchFn?: typeof fetch; api?: ProductProvider; partnerTag?: string } = {},
 ): Promise<ProductLookup> {
-  const fromApi = await lookupFromApi(asin, opts.api ?? new CreatorsApiProvider())
+  // No channel here: the account's store/tracking ID (CREATORS_PARTNER_TAG)
+  const partnerTag = opts.partnerTag ?? useOptionalEnv().CREATORS_PARTNER_TAG?.trim() ?? ''
+  const fromApi = await lookupFromApi(asin, opts.api ?? getCreatorsProvider(), partnerTag)
   return fromApi ?? lookupFromPage(asin, opts.fetchFn)
 }
