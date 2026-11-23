@@ -15,7 +15,7 @@ import {
   type InlineButton,
   type TelegramEntity,
 } from '../domain/intake'
-import { parseAsin } from '../domain/affiliate'
+import { affiliateTagFrom, isAffiliateShortLink, parseAsin, type OwnAffiliateLink } from '../domain/affiliate'
 import { withFeatureBullets } from '../domain/amazon-page'
 import { TransitionError } from '../domain/publication'
 import type { Db } from '../utils/db'
@@ -77,7 +77,19 @@ export const INTAKE_USER_AGENT = 'Agent/OfertasBuzon (resolución de enlaces cor
  * de amazon.es.
  */
 export async function resolveShortLink(url: string, fetchFn: typeof fetch = fetch): Promise<string | null> {
+  return (await resolveShortLinkDetails(url, fetchFn))?.asin ?? null
+}
+
+/**
+ * Like `resolveShortLink`, and also returns the affiliate `tag` found in the redirect
+ * targets (null if none). Reads only `Location` headers; no extra requests.
+ */
+export async function resolveShortLinkDetails(
+  url: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ asin: string; tag: string | null } | null> {
   let current = url
+  let tag: string | null = null
   for (let hop = 0; hop < 4; hop++) {
     const host = new URL(current).hostname
     if (/(^|\.)amazon\.[a-z.]+$/i.test(host)) return null // no se accede a páginas de Amazon
@@ -89,11 +101,19 @@ export async function resolveShortLink(url: string, fetchFn: typeof fetch = fetc
     const location = res.headers.get('location')
     if (!location || res.status < 300 || res.status >= 400) return null
     const next = new URL(location, current).toString()
+    tag = affiliateTagFrom(next) ?? tag
     const asin = parseAsin(next)
-    if (asin) return asin
+    if (asin) return { asin, tag }
     current = next
   }
   return null
+}
+
+/** Product reference from what a person pastes or shares, plus their own short link if tagged. */
+export interface ProductInput {
+  asin: string
+  /** The pasted Amazon short link, kept only if it resolves with an affiliate tag. */
+  affiliateLink: OwnAffiliateLink | null
 }
 
 /**
@@ -101,13 +121,30 @@ export async function resolveShortLink(url: string, fetchFn: typeof fetch = fetc
  * un enlace corto (link.amazon, amzn.eu…). Lo usan el bot buzón y el alta manual del panel.
  */
 export async function resolveAsinInput(input: string, fetchFn: typeof fetch = fetch): Promise<string | null> {
+  return (await resolveProductInput(input, fetchFn))?.asin ?? null
+}
+
+/** Like `resolveAsinInput`, and keeps the user's own affiliate short link when it has a tag. */
+export async function resolveProductInput(input: string, fetchFn: typeof fetch = fetch): Promise<ProductInput | null> {
   const direct = parseAsin(input)
-  if (direct) return direct
-  const picked = pickAmazonUrl(extractUrls(input.trim()))
+  if (direct) return { asin: direct, affiliateLink: null }
+  return resolvePickedUrl(pickAmazonUrl(extractUrls(input.trim())), fetchFn)
+}
+
+async function resolvePickedUrl(
+  picked: ReturnType<typeof pickAmazonUrl>,
+  fetchFn: typeof fetch | undefined,
+): Promise<ProductInput | null> {
   if (!picked) return null
-  if ('asin' in picked) return picked.asin
+  if ('asin' in picked) return { asin: picked.asin, affiliateLink: null }
   try {
-    return await resolveShortLink(picked.shortUrl, fetchFn)
+    const resolved = await resolveShortLinkDetails(picked.shortUrl, fetchFn)
+    if (!resolved) return null
+    const url = new URL(picked.shortUrl)
+    url.hash = ''
+    const affiliateLink =
+      resolved.tag != null && isAffiliateShortLink(url.href) ? { url: url.href, tag: resolved.tag } : null
+    return { asin: resolved.asin, affiliateLink }
   } catch {
     return null
   }
@@ -204,16 +241,12 @@ export class IntakeBot {
       await this.send(chatId, 'No veo ningún enlace de Amazon. Compárteme un producto desde la app de Amazon o pega su enlace de amazon.es.')
       return
     }
-    let asin: string | null
-    try {
-      asin = 'asin' in picked ? picked.asin : await resolveShortLink(picked.shortUrl, this.ctx.fetchFn)
-    } catch {
-      asin = null
-    }
-    if (!asin) {
+    const resolved = await resolvePickedUrl(picked, this.ctx.fetchFn)
+    if (!resolved) {
       await this.send(chatId, 'No he podido sacar el ASIN de ese enlace. Prueba con el enlace completo de amazon.es.')
       return
     }
+    const { asin, affiliateLink } = resolved
 
     const { priceCents: typedPrice, rest } = extractPrice(text)
     let product: ProductLookup | null = null
@@ -238,6 +271,8 @@ export class IntakeBot {
       basisPriceCents: product?.basisPriceCents ?? null,
       basisType: product?.basisType ?? null,
       features: product?.features ?? [],
+      affiliateUrl: affiliateLink?.url ?? null,
+      affiliateTag: affiliateLink?.tag ?? null,
     }
     await this.ctx.db.insert(intakeDrafts).values(draft)
     const card = draftCard(draft, await this.manualThemes(), { warning })
@@ -331,6 +366,8 @@ export class IntakeBot {
       priceCents: draft.priceCents,
       basisPriceCents: draft.priceCents != null ? draft.basisPriceCents : null,
       basisType: draft.basisType,
+      affiliateUrl: draft.affiliateUrl,
+      affiliateTag: draft.affiliateTag,
     })
     const { runId } = await withRun(db, 'scan', 'manual', themeId, (log) =>
       scanTheme(db, theme, log, {

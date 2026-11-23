@@ -1,5 +1,5 @@
 import type { ManualBasisType } from '../../shared/types'
-import { buildManualLink } from '../domain/affiliate'
+import { manualLink } from '../domain/affiliate'
 import type { ProductSnapshot } from '../domain/product'
 import type { ProductProvider, ThemeSearchQuery } from './types'
 
@@ -15,6 +15,9 @@ export interface ManualProductRecord {
   basisType: ManualBasisType | null
   /** Momento del alta: es la «hora de consulta» del precio. */
   createdAt: number
+  /** The user's own Amazon short link and its tracking ID (null = standard link). */
+  affiliateUrl: string | null
+  affiliateTag: string | null
 }
 
 /** Acceso a las altas manuales; lo implementa el servicio con D1. */
@@ -27,6 +30,7 @@ export interface ManualProductSource {
  * Productos dados de alta a mano (panel o bot buzón). Si se indicó precio, se publica
  * con la fecha y hora del alta (SPEC §14.7, modo de validación del MVP); si no, sin precio.
  * El enlace es el estándar de Afiliados.
+ * Exception: on channels whose tracking ID matches its tag, the user's own Amazon short link.
  */
 export class ManualProvider implements ProductProvider {
   readonly id = 'manual' as const
@@ -44,7 +48,11 @@ export class ManualProvider implements ProductProvider {
       capturedAt: record.priceCents != null ? record.createdAt : this.now(),
       title: record.title,
       brand: record.brand,
-      detailPageUrl: buildManualLink(record.asin, partnerTag),
+      detailPageUrl: manualLink(
+        record.asin,
+        partnerTag,
+        record.affiliateUrl && record.affiliateTag ? { url: record.affiliateUrl, tag: record.affiliateTag } : null,
+      ),
       imageUrl: null,
       offer:
         record.priceCents != null
