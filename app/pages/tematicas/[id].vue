@@ -46,7 +46,7 @@ if (!isNew.value) {
 const providerItems = [
   { label: 'Simulado (desarrollo)', value: 'mock' },
   { label: 'Alta manual', value: 'manual' },
-  { label: 'Creators API (fase 2)', value: 'creators_api', disabled: true },
+  { label: 'Creators API', value: 'creators_api' },
 ]
 
 // Índices de búsqueda de amazon.es más habituales (lista completa en docs/creators-api.md)
@@ -124,7 +124,7 @@ async function remove() {
           <UFormField
             label="Fuente de productos"
             name="provider"
-            :help="state.provider === 'mock' ? 'Catálogo de ejemplo (~30 productos ficticios de bebé, gaming y hogar). Palabras que encuentran algo: pañales, toallitas, cochecito, biberones, auriculares, teclado, freidora, robot aspirador…' : 'Sin acceso a la API, usa «Alta manual»: se publica sin precio (SPEC §14.1).'"
+            :help="state.provider === 'mock' ? 'Catálogo de ejemplo (~30 productos ficticios de bebé, gaming y hogar). Palabras que encuentran algo: pañales, toallitas, cochecito, biberones, auriculares, teclado, freidora, robot aspirador…' : state.provider === 'creators_api' ? 'Busca en amazon.es con la Creators API por palabras clave o nodos. Si la cuenta no tiene acceso, el escaneo lo indica en Ejecuciones: usa «Alta manual».' : 'Sin acceso a la API, usa «Alta manual»: se publica sin precio (SPEC §14.1).'"
           >
             <USelect v-model="state.provider" :items="providerItems" class="w-full" />
           </UFormField>

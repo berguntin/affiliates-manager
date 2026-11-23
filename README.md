@@ -167,6 +167,9 @@ Las ejecuciones aparecen en **Más → Ejecuciones**, que también permite lanza
 | `AUTH_ALLOWED_EMAILS` | secreto | Emails autorizados, separados por comas |
 | `TELEGRAM_BOT_TOKEN` | secreto | Token del bot de Telegram |
 | `ANTHROPIC_API_KEY` | secreto | Opcional. Activa la entradilla redactada por IA (SPEC §14.6) y el botón «Redactar con IA» del alta manual (§14.9); sin ella, solo plantilla |
+| `CREATORS_CREDENTIAL_ID` | secreto | Opcional. *Credential ID* de la Creators API (versión 3.2, amazon.es). Sin él, las temáticas «Creators API» no escanean y la consulta de producto usa la ficha |
+| `CREATORS_CREDENTIAL_SECRET` | secreto | *Credential Secret* de la Creators API |
+| `CREATORS_PARTNER_TAG` | secreto | *Store ID* o tracking ID de amazon.es para las consultas sin canal (alta manual). Las búsquedas y la recomprobación usan el tracking ID de cada canal |
 | `AUTH_DISABLED` | solo local | `true` desactiva la autenticación. **Solo se respeta en `nuxt dev`** |
 
 En local van en `.dev.vars` (ignorado por git). En producción se configuran con `wrangler secret put NOMBRE`. **Nunca se guardan secretos en el repositorio.**

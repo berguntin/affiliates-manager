@@ -16,3 +16,8 @@ AUTH_DISABLED=true
 # INTAKE_BOT_TOKEN=123456:XYZ...
 # INTAKE_WEBHOOK_SECRET=una-cadena-aleatoria-larga
 # INTAKE_ALLOWED_USER_IDS=111111111,222222222
+
+# Amazon Creators API (docs/creators-api.md), credencial versión 3.2 de amazon.es
+# CREATORS_CREDENTIAL_ID=amzn1.application-oa2-client.xxxx
+# CREATORS_CREDENTIAL_SECRET=amzn1.oa2-cs.v1.xxxx
+# CREATORS_PARTNER_TAG=mitienda-21

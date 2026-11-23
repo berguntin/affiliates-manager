@@ -16,6 +16,10 @@ export interface RetryOptions {
   /** Segundos de espera que indica el servicio (Retry-After, retry_after…). */
   retryAfter?: (response: Response, body: unknown) => number | null
   sleep?: (ms: number) => Promise<void>
+  /** Per-attempt timeout; a timed-out attempt counts as a network error and is retried. */
+  timeoutMs?: number
+  /** Injectable fetch, for tests. */
+  fetchFn?: typeof fetch
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -34,23 +38,31 @@ export async function fetchJsonWithRetry<T>(
   const base = options.baseDelayMs ?? 500
   const max = options.maxDelayMs ?? 15_000
   const sleep = options.sleep ?? defaultSleep
+  const fetchFn: typeof fetch = options.fetchFn ?? ((input, init) => fetch(input, init))
 
   for (let attempt = 0; ; attempt++) {
     let response: Response
+    let body: unknown
     try {
-      response = await fetch(url, init)
+      const signal =
+        options.timeoutMs == null
+          ? init.signal
+          : init.signal
+            ? AbortSignal.any([init.signal, AbortSignal.timeout(options.timeoutMs)])
+            : AbortSignal.timeout(options.timeoutMs)
+      response = await fetchFn(url, signal ? { ...init, signal } : init)
+      // Reading the body is inside the try: a timeout while reading is retried too
+      const text = await response.text()
+      body = text
+      try {
+        body = text ? JSON.parse(text) : null
+      } catch {
+        // cuerpo no JSON
+      }
     } catch (error) {
       if (attempt >= retries) throw error
       await sleep(Math.min(max, base * 2 ** attempt) * (0.5 + Math.random() / 2))
       continue
-    }
-
-    const text = await response.text()
-    let body: unknown = text
-    try {
-      body = text ? JSON.parse(text) : null
-    } catch {
-      // cuerpo no JSON
     }
     if (response.ok) return body as T
 
