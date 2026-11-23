@@ -10,6 +10,15 @@ const rows = computed(() => [
     value: !status.value ? unknown : status.value.telegramConfigured ? 'Configurado' : 'Sin configurar',
     ok: status.value?.telegramConfigured,
   },
+  {
+    label: 'Pasarela de WhatsApp (WHATSAPP_GATEWAY_TOKEN)',
+    value: !status.value
+      ? unknown
+      : status.value.whatsappAutomatic
+        ? 'Configurada (publicación automática)'
+        : 'Sin configurar (publicación asistida)',
+    ok: status.value?.whatsappAutomatic,
+  },
   { label: 'Creators API', value: 'Fase 2 (requiere 10 ventas en 30 días)', ok: false },
   {
     label: 'Redacción con IA (ANTHROPIC_API_KEY)',

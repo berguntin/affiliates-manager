@@ -116,10 +116,10 @@ Interfaz abstracta con al menos tres implementaciones:
 | Adaptador | Modo | Detalle |
 |---|---|---|
 | **Telegram** ⚠️ §13.A.3 | Automático | Bot API oficial en canales: `sendPhoto` con texto (caption) y botón al producto (inline keyboard). |
-| **WhatsApp** ⚠️ §13.A.3 | **Asistido** | La API oficial no permite publicar en Canales. El panel prepara texto + imagen. En **móvil**: botón con **Web Share API (con archivo)** para compartir a WhatsApp. En **escritorio**: copiar texto y descargar imagen. Después se marca manualmente como publicada. |
+| **WhatsApp** ⚠️ §13.A.3 | **Asistido** | La API oficial no permite publicar en Canales. El panel prepara texto + imagen. En **móvil**: botón con **Web Share API (con archivo)** para compartir a WhatsApp. En **escritorio**: copiar texto y descargar imagen. Después se marca manualmente como publicada. *Modificado por §14.11: automático opcional con pasarela no oficial.* |
 | *Futuros* | — | p. ej. Instagram vía Graph API. El diseño debe permitir añadir adaptadores sin tocar el núcleo. |
 
-🚫 **Nada de librerías no oficiales de WhatsApp** (Baileys, whatsapp-web.js, etc.): riesgo de baneo del número.
+🚫 **Nada de librerías no oficiales de WhatsApp** (Baileys, whatsapp-web.js, etc.): riesgo de baneo del número. *Modificado por §14.11 (2026-11-23): se permite, de forma opcional, publicar por una pasarela HTTP no oficial.*
 
 ---
 
@@ -155,7 +155,7 @@ Interfaz abstracta con al menos tres implementaciones:
 2. CRUD de temáticas y canales.
 3. `ManualProvider` y `MockProvider`, instantáneas de precio con caducidad de 24 h y detección de ofertas con los datos de Amazon (§14.2).
 4. Generación de mensajes con plantillas.
-5. Cola de publicaciones con Telegram automático y WhatsApp asistido.
+5. Cola de publicaciones con Telegram automático y WhatsApp asistido. *(WhatsApp automático opcional por pasarela: §14.11.)*
 6. Cron diario funcionando contra `MockProvider`.
 
 ### Fase 2
@@ -177,7 +177,7 @@ Hipótesis: los administradores de canales de chollos en Telegram y WhatsApp pag
 - **Precio y descuento manuales (§14.7).** En SaaS desaparecen o quedan en modo «solo API». Las altas manuales se publican sin precio, como en §14.1.
 - **Credenciales propias.** Cada cliente usa su propia cuenta de Afiliados y sus credenciales de la Creators API, nunca las de la plataforma. Amazon solo da acceso a la API a afiliados con ventas recientes, así que el público inicial son canales que ya generan comisiones; sin API, la herramienta se queda en alta manual sin precio.
 - **Mismas reglas para todos.** Sin scraping, sin almacenar imágenes y con los textos de IA limitados a lo que permite la Licencia (§14.6 y §14.9). Hay que revisar si los términos de Afiliados y de la Creators API permiten que un tercero opere la API por cuenta del afiliado, y documentarlo antes de lanzar.
-- **WhatsApp.** Sigue siendo asistido: no hay API oficial para publicar en Canales. Hay que comunicarlo con claridad.
+- **WhatsApp.** Sigue siendo asistido: no hay API oficial para publicar en Canales. Hay que comunicarlo con claridad. *(Modificado por §14.11: automático opcional con pasarela no oficial.)*
 
 **3. Trabajo técnico** (la base actual se mantiene: Workers, D1, Nitro y la lógica separada en dominio, proveedores y canales):
 - **Multicliente.** Un `tenant_id` en todas las tablas y en todas las consultas, o una D1 por cliente. Hay que decidirlo en función del volumen.
@@ -263,3 +263,10 @@ Revisado con la documentación oficial de la Creators API y las **Políticas y e
    **Cambio (2026-11-06):** la IA ya no filtra el contenido de las notas. Redacta con todo lo que escriba el usuario (cifras, porcentajes, precios, características, envío…) sin rechazarlo ni recortarlo, y sigue las indicaciones de estilo que incluya. Ya no se exige un número de frases; sigue sin describir el producto por su cuenta. Solo se comprueba que el texto no venga vacío y no pase de 480 caracteres. El propietario revisa el texto antes de crear la candidata y asume la responsabilidad de cumplir las normas de Amazon al publicar; los avisos legales y el bloque de precio los sigue añadiendo siempre el renderizador. La entradilla (§14.6) mantiene su validación.
 10. **Avisos legales en la descripción del canal.** Los textos completos de Amazon (el aviso de afiliado y el descargo de precios) van en la **descripción de cada canal**, y no se repiten en los mensajes. Cada mensaje lleva solo:
     - la fecha y hora de consulta junto al precio;
+11. **Publicación automática en WhatsApp con pasarela no oficial (2026-11-23)** — decisión del propietario; modifica §9 (adaptador de WhatsApp y prohibición de librerías no oficiales). La API oficial de Meta (Cloud API) no permite publicar en Canales, así que el propietario acepta usar una **pasarela HTTP no oficial** (Whapi.Cloud u otra con la misma API) que maneja un número normal de WhatsApp vinculado a ella. El propietario asume el **riesgo de baneo del número** y el incumplimiento de las condiciones de WhatsApp. Condiciones:
+    - Es opcional y por canal. Un canal de WhatsApp se publica solo (botón «Publicar ya», cola programada y 🚀 del bot buzón) cuando existe el secreto `WHATSAPP_GATEWAY_TOKEN` **y** su identificador es su id en la pasarela (`…@newsletter`). Sin el secreto, o con el enlace del canal como identificador, sigue siendo asistido. `WHATSAPP_GATEWAY_URL` cambia la URL base (por defecto `https://gate.whapi.cloud`; solo `https://`).
+    - El número conectado debe ser administrador del Canal. «Verificar» comprueba que la pasarela tiene el número conectado.
+    - «Ya lo he publicado» y ✅ solo marcan; nunca envían. «Publicar ya» y 🚀 solo envían; nunca marcan sin enviar. El envío no se reintenta ante errores 5xx o de red (podría duplicarse); solo ante 429. Si el resultado es dudoso (5xx, conexión cortada o respuesta sin id), la publicación pasa a revisión con el aviso «Puede que se haya enviado» para no reenviarla sin comprobar el canal: en el panel se resuelve con «Sí se envió» (la marca como publicada sin enviar) o «No se envió» (quita la revisión sin tocar el texto).
+    - Los recordatorios de WhatsApp vencidos hace más de dos ciclos de la cola no se envían solos (pueden haberse compartido ya a mano): vuelven a «aprobada» con un aviso. Cada ciclo envía como máximo 10 publicaciones; el resto espera al siguiente.
+    - Se envía solo el texto renderizado, con el enlace de afiliado intacto, y WhatsApp genera la vista previa (§14.3). Antes de enviar se recomprueba el precio, igual que en Telegram. Los enlaces siguen yendo solo a Canales públicos con suscriptores voluntarios (§13.A.6), nunca a grupos ni chats.
+    - El Worker no mantiene la sesión de WhatsApp Web: solo llama a la pasarela. No se usan librerías no oficiales dentro del Worker.

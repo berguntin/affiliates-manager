@@ -1,6 +1,6 @@
 # Ofertas · gestor de canales de afiliados de Amazon
 
-Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, prepara los mensajes con enlace de afiliado y gestiona su publicación en **Telegram** (automática) y **WhatsApp** (asistida). El panel está en español y pensado para usarse desde el móvil.
+Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, prepara los mensajes con enlace de afiliado y gestiona su publicación en **Telegram** (automática) y **WhatsApp** (asistida, o automática con una pasarela no oficial, SPEC §14.11). El panel está en español y pensado para usarse desde el móvil.
 
 > *English summary:* a mobile-first back office to run Amazon affiliate deal channels on Telegram and WhatsApp. It finds deals, filters out inflated discounts, writes on-brand copy with Claude, and schedules or publishes posts. It runs on a single Cloudflare Worker (Nuxt 4, Nitro, D1, Cron Triggers) and is designed around Amazon Associates policy compliance.
 
@@ -21,7 +21,7 @@ Herramienta que detecta ofertas de **Amazon.es** por temáticas configurables, p
 3. **Gestiona una cola** de candidatas: revisar, editar, aprobar, programar en el siguiente ciclo del cron, publicar o descartar. Las candidatas caducan a las 24 h.
 4. **Publica:**
    - en **Telegram**, automáticamente vía Bot API;
-   - en **WhatsApp**, de forma asistida: se comparte desde el móvil, porque no hay API oficial para Canales.
+   - en **WhatsApp**, de forma asistida (se comparte desde el móvil, porque no hay API oficial para Canales) o automática con la pasarela no oficial de SPEC §14.11.
 5. **Bot buzón:** se comparte un producto desde la app de Amazon a un bot de Telegram, que lo da de alta, crea la candidata y permite publicarla desde el chat.
 
 ## Arquitectura
@@ -102,7 +102,7 @@ Más detalle en [`docs/arquitectura.md`](docs/arquitectura.md).
 
 - **Fase 1 (MVP):** completada y desplegada.
   - Fuentes: alta manual y proveedor simulado.
-  - Publicación en Telegram y WhatsApp asistido.
+  - Publicación en Telegram y WhatsApp (asistido, o automático por pasarela).
   - Redacción con IA.
   - Bot buzón.
 - **Fase 2:** integración con la Creators API de Amazon (pendiente de acceso a la API) y estadísticas.
@@ -166,6 +166,8 @@ Las ejecuciones aparecen en **Más → Ejecuciones**, que también permite lanza
 | `AUTH_AUDIENCE` | secreto | *Application Audience (AUD) Tag* de la aplicación de Access |
 | `AUTH_ALLOWED_EMAILS` | secreto | Emails autorizados, separados por comas |
 | `TELEGRAM_BOT_TOKEN` | secreto | Token del bot de Telegram |
+| `WHATSAPP_GATEWAY_TOKEN` | secreto | Opcional. Token de la pasarela no oficial de WhatsApp (SPEC §14.11). Con él, los canales de WhatsApp se publican solos; sin él, publicación asistida |
+| `WHATSAPP_GATEWAY_URL` | var | Opcional. URL base de la pasarela. Por defecto `https://gate.whapi.cloud` |
 | `ANTHROPIC_API_KEY` | secreto | Opcional. Activa la entradilla redactada por IA (SPEC §14.6) y el botón «Redactar con IA» del alta manual (§14.9); sin ella, solo plantilla |
 | `AUTH_DISABLED` | solo local | `true` desactiva la autenticación. **Solo se respeta en `nuxt dev`** |
 
@@ -219,7 +221,7 @@ Un **bot aparte** del que publica. Compartís un producto desde la app de Amazon
 3. Elegís la temática (solo las de fuente «Alta manual»). Se crea la candidata en cada canal con la entradilla de IA.
 4. Desde la misma tarjeta:
    - Telegram: 🚀 publicar, ⏰ próximo ciclo o 🗑️ descartar.
-   - WhatsApp: 📋 recibir el texto, ✅ marcar como hecho o 🗑️ descartar.
+   - WhatsApp asistido: 📋 recibir el texto, ✅ marcar como hecho o 🗑️ descartar. WhatsApp automático (pasarela): los mismos botones que Telegram.
 
 Configuración:
 1. Crea el bot con [@BotFather](https://t.me/BotFather) (`/newbot`) y, en `/setjoingroups`, desactiva que lo añadan a grupos.
@@ -237,9 +239,19 @@ Configuración:
 4. En el panel, **Ajustes → Bot buzón → Conectar webhook**.
 5. Para que tu pareja use también el panel, añade su email a la política de Access y a `AUTH_ALLOWED_EMAILS`.
 
+### WhatsApp automático (pasarela no oficial, opcional)
+
+La API oficial no permite publicar en Canales de WhatsApp. Por decisión del propietario (SPEC §14.11), se puede publicar solo a través de una pasarela HTTP no oficial (Whapi.Cloud u otra con la misma API) que maneja un número de WhatsApp vinculado. **Riesgo: WhatsApp puede banear ese número.**
+
+1. Vincula el número en la pasarela y hazlo administrador del Canal.
+2. Configura `WHATSAPP_GATEWAY_TOKEN` (y, si no es Whapi.Cloud, `WHATSAPP_GATEWAY_URL`, siempre `https://`).
+3. En cada canal de WhatsApp que quieras automatizar, pon como identificador el id del canal en la pasarela (`…@newsletter`, lo da `GET /newsletters`) y pulsa **Verificar**. Los canales que mantengan el enlace del canal siguen siendo asistidos.
+
+Con eso, esos canales se publican como Telegram: **Publicar ya**, cola programada y 🚀 en el bot buzón. Los recordatorios de WhatsApp que vencieron hace más de 20 minutos no se envían solos (vuelven a «aprobada» con un aviso) por si ya se compartieron a mano.
+
 ### WhatsApp (publicación asistida)
 
-La API oficial no permite publicar en Canales de WhatsApp, y las librerías no oficiales arriesgan el baneo del número, así que no se usan. En la cola, **Compartir en WhatsApp**:
+Sin pasarela, o en canales con el enlace como identificador. En la cola, **Compartir en WhatsApp**:
 1. recomprueba el precio;
 2. abre el menú de compartir del móvil (o permite copiar el texto);
 3. cuando hayas publicado, márcalo con **Ya lo he publicado**.
@@ -259,7 +271,7 @@ shared/           Tipos y validaciones (zod) comunes a panel y API
 server/
   domain/         Lógica de negocio pura (ofertas, deduplicación, mensajes, estados, franjas)
   providers/      ProductProvider: manual, simulado, Creators API (fase 2) e histórico (Keepa, pendiente)
-  channels/       ChannelAdapter: Telegram (automático) y WhatsApp (asistido)
+  channels/       ChannelAdapter: Telegram (automático) y WhatsApp (asistido, o automático por pasarela)
   services/       Orquestación con E/S: escaneo, cola, plantillas, ejecuciones
   api/            Endpoints REST del panel
   tasks/          Tareas Nitro del cron

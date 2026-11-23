@@ -12,6 +12,10 @@ AUTH_DISABLED=true
 # Telegram (secreto)
 # TELEGRAM_BOT_TOKEN=123456:ABC...
 
+# WhatsApp automático por pasarela no oficial (SPEC §14.11, opcional; secreto)
+# WHATSAPP_GATEWAY_TOKEN=token-de-la-pasarela
+# WHATSAPP_GATEWAY_URL=https://gate.whapi.cloud
+
 # Bot buzón (SPEC §14.8): bot APARTE del que publica
 # INTAKE_BOT_TOKEN=123456:XYZ...
 # INTAKE_WEBHOOK_SECRET=una-cadena-aleatoria-larga

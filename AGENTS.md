@@ -4,7 +4,7 @@ Rules for coding agents working in this repository. Details live in [README.md](
 
 ## What this is
 
-A private, mobile-first back office (Spanish UI) that finds Amazon.es deals per theme, renders affiliate messages per channel, and publishes them to Telegram (automatic, Bot API) and WhatsApp (assisted, user shares from the phone). One Cloudflare Worker serves the SPA panel, the JSON API, a Telegram webhook ("bot buzón") and two cron tasks. Amazon Associates compliance is a design requirement, not a nice-to-have.
+A private, mobile-first back office (Spanish UI) that finds Amazon.es deals per theme, renders affiliate messages per channel, and publishes them to Telegram (automatic, Bot API) and WhatsApp (assisted, user shares from the phone; or automatic per channel through an unofficial gateway, SPEC §14.11). One Cloudflare Worker serves the SPA panel, the JSON API, a Telegram webhook ("bot buzón") and two cron tasks. Amazon Associates compliance is a design requirement, not a nice-to-have.
 
 ## Stack
 
@@ -72,7 +72,7 @@ Patterns:
 - **Accepted exception (Amazon product page lookup):** `server/services/product-lookup.ts` reads the amazon.es product page (`lookupFromPage`) to prefill title, brand, prices and feature bullets in the manual add flow (panel `POST /api/products/lookup` and bot buzón), only when the Creators API is unavailable. The owner accepts this risk for the validation phase. Limits: only on explicit user action for one ASIN, the result is reviewed by a human before creating a candidate, never used by `scan`, `queue:tick` or any automatic flow, and it must be removed once the Creators API is available. Do not extend it (more fields, more call sites, crawling, retries to bypass blocks).
 - AI copy (`server/services/copywriter.ts`, prompts and validators in `server/domain/messages/intro.ts` and `description.ts`): the AI never describes or paraphrases Amazon content on its own and never invents numbers, prices, shipping or "historic low" claims. The automatic intro (`intro.ts`) writes only from the theme tone, and every output passes its validator before use; on failure the message falls back to the template. Max `MAX_INTROS_PER_RUN` calls per run.
 - The manual "Redactar con IA" text (`description.ts`) writes whatever the user's notes say, without filtering their content (SPEC §14.9, amended 2026-11-06): the owner reviews it and is responsible for compliance when publishing. Its validator only checks empty output and `DESCRIPTION_MAX`. Do not add content filters back without the owner's decision.
-- WhatsApp stays assisted: no unofficial WhatsApp libraries.
+- WhatsApp is assisted unless `WHATSAPP_GATEWAY_TOKEN` is set; then `server/channels/whatsapp-gateway.ts` publishes automatically through an unofficial HTTP gateway (owner decision, SPEC §14.11; the owner accepts the number-ban risk). Keep it behind that secret, send only the rendered text with the untouched affiliate link, only to Channels (`…@newsletter`), never to groups or chats. Do not add WhatsApp client libraries to the Worker.
 
 ## Risk areas
 
@@ -91,6 +91,7 @@ Patterns:
 - `/api/*` requires a valid Access JWT and an email in `AUTH_ALLOWED_EMAILS`. `AUTH_DISABLED=true` is honored only under `import.meta.dev`; never widen it.
 - The webhook lives outside `/api` and is authenticated with `X-Telegram-Bot-Api-Secret-Token` compared in constant time (`safeEqual`), plus the `INTAKE_ALLOWED_USER_IDS` allowlist. Any new non-`/api` route needs its own authentication.
 - Errors and logs contain variable names, never secret values, tokens, JWTs or full emails.
+- `WHATSAPP_GATEWAY_TOKEN` goes only in the `Authorization` header of gateway calls; never in URLs, errors or logs.
 - Test with `tests/utils/access.test.ts`, `tests/domain/intake.test.ts`, `tests/services/intake-links.test.ts`.
 
 ### Database and migrations

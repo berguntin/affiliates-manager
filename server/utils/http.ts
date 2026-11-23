@@ -16,6 +16,10 @@ export interface RetryOptions {
   /** Segundos de espera que indica el servicio (Retry-After, retry_after…). */
   retryAfter?: (response: Response, body: unknown) => number | null
   sleep?: (ms: number) => Promise<void>
+  /** For non-idempotent requests: retry only 429 (the request was refused), never 5xx or network errors. */
+  retryOnlyRateLimit?: boolean
+  /** Injectable fetch for tests. */
+  fetchFn?: typeof fetch
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -34,13 +38,14 @@ export async function fetchJsonWithRetry<T>(
   const base = options.baseDelayMs ?? 500
   const max = options.maxDelayMs ?? 15_000
   const sleep = options.sleep ?? defaultSleep
+  const fetchFn = options.fetchFn ?? fetch
 
   for (let attempt = 0; ; attempt++) {
     let response: Response
     try {
-      response = await fetch(url, init)
+      response = await fetchFn(url, init)
     } catch (error) {
-      if (attempt >= retries) throw error
+      if (attempt >= retries || options.retryOnlyRateLimit) throw error
       await sleep(Math.min(max, base * 2 ** attempt) * (0.5 + Math.random() / 2))
       continue
     }
@@ -54,7 +59,7 @@ export async function fetchJsonWithRetry<T>(
     }
     if (response.ok) return body as T
 
-    const retryable = response.status === 429 || response.status >= 500
+    const retryable = response.status === 429 || (!options.retryOnlyRateLimit && response.status >= 500)
     if (!retryable || attempt >= retries) {
       throw new HttpError(response.status, body, `HTTP ${response.status}`)
     }

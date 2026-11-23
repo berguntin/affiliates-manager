@@ -1,7 +1,9 @@
+import { publishInputSchema } from '../../../../shared/schemas'
 import { publish } from '../../../services/queue'
 
-/** Telegram: envía. WhatsApp: marca como publicada tras compartir. Siempre recomprueba el precio. */
+/** intent `send`: automatic channels send now. intent `mark`: assisted channels, after sharing. Always rechecks the price. */
 export default defineEventHandler(async (event) => {
   const id = requireParam(event, 'id')
-  return handleDomainErrors(() => publish(useDb(), id, queueContext()))
+  const { intent } = await readValidated(event, publishInputSchema)
+  return handleDomainErrors(() => publish(useDb(), id, queueContext(), intent))
 })

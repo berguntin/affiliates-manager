@@ -31,8 +31,13 @@ export interface QueueItem {
   channelId: string
   channelName: string
   channelType: ChannelType
+  /** The system publishes this item's channel (Telegram, or WhatsApp through the gateway). */
+  automatic: boolean
   actions: ('approve' | 'schedule' | 'unschedule' | 'publish' | 'discard' | 'edit')[]
 }
+
+/** Review reason after a send whose outcome is unknown (gateway 5xx, dropped connection, no id). */
+export const UNCERTAIN_DELIVERY_REASON = 'Puede que se haya enviado: compruébalo en el canal antes de volver a publicar'
 
 export const STATUS_LABELS: Record<PublicationStatus, string> = {
   candidata: 'Candidata',

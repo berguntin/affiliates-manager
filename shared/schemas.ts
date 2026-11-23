@@ -93,6 +93,16 @@ export const channelInputSchema = z
 export type ChannelInput = z.input<typeof channelInputSchema>
 export type ChannelData = z.output<typeof channelInputSchema>
 
+/** WhatsApp Channel (newsletter) id used by the gateway, e.g. `120363171744447809@newsletter`. */
+export const WHATSAPP_NEWSLETTER_ID_RE = /^\d{10,18}@newsletter$/
+
+/** `send`: the system sends it (automatic channels). `mark`: the user already shared it (assisted). */
+export const publishInputSchema = z.object({ intent: z.enum(['send', 'mark']) })
+/** Resolves an uncertain send after checking the channel. */
+export const deliveryInputSchema = z.object({ delivered: z.boolean() })
+
+export type PublishIntent = z.output<typeof publishInputSchema>['intent']
+
 export const ASIN_RE = /^[A-Z0-9]{10}$/
 
 /** Texto propio del alta manual (comentario y viñetas de características). */
