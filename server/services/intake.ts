@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, like } from 'drizzle-orm'
 import { nextTick } from '../../shared/queue-cycle'
 import { callTelegram } from '../channels/telegram-api'
+import { isAutomaticChannel } from '../channels'
 import {
   HELP_TEXT,
   decodeCallback,
@@ -414,6 +415,7 @@ export class IntakeBot {
         id: publications.id,
         channelName: channels.name,
         channelType: channels.type,
+        channelIdentifier: channels.identifier,
         status: publications.status,
         needsReview: publications.needsReview,
         reviewReason: publications.reviewReason,
@@ -427,7 +429,10 @@ export class IntakeBot {
     const theme = draft.themeId ? await getTheme(this.ctx.db, draft.themeId) : null
     const card = queuedCard(
       { title: draft.title ?? '', themeName: theme?.name ?? '', priceCents: draft.priceCents },
-      pubs,
+      pubs.map(({ channelIdentifier, ...p }) => ({
+        ...p,
+        automatic: isAutomaticChannel({ type: p.channelType, identifier: channelIdentifier }, this.ctx.env),
+      })),
       {
         formatTime: this.formatTime,
         nextCycle: nextTick(this.now()),
@@ -450,7 +455,8 @@ export class IntakeBot {
     switch (kind) {
       case 'publish':
       case 'done': {
-        const result = await publish(db, publicationId, this.queueContext())
+        // 🚀 sends (automatic channels); ✅ only marks what the user already shared (assisted).
+        const result = await publish(db, publicationId, this.queueContext(), kind === 'publish' ? 'send' : 'mark')
         reply = result.published ? 'Publicada ✅' : `Requiere revisión: ${result.item.reviewReason ?? 'cambio de precio'}`
         break
       }

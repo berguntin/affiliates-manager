@@ -20,6 +20,14 @@ export interface ChannelAdapter {
   verify?(channel: ChannelTarget): Promise<{ ok: boolean; detail: string }>
 }
 
+/** The network may have delivered the message although the send failed (5xx, dropped connection, no id). */
+export class UncertainDeliveryError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UncertainDeliveryError'
+  }
+}
+
 export class ChannelConfigError extends Error {
   constructor(message: string) {
     super(message)

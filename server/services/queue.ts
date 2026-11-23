@@ -1,7 +1,10 @@
 import { and, desc, eq, inArray, isNull, lte, ne, or, sql } from 'drizzle-orm'
-import { alignToTick, nextTick } from '../../shared/queue-cycle'
+import { QUEUE_TICK_MINUTES, alignToTick, nextTick } from '../../shared/queue-cycle'
 import type { ChannelType, PublicationStatus } from '../../shared/types'
-import { getChannelAdapter } from '../channels'
+import { UNCERTAIN_DELIVERY_REASON } from '../../shared/api'
+import type { PublishIntent } from '../../shared/schemas'
+import { getChannelAdapter, isAutomaticChannel, type ChannelEnv } from '../channels'
+import { UncertainDeliveryError } from '../channels/types'
 import { evaluateDeal } from '../domain/deals'
 import { checkRequiredElements, formatCheckedAt, renderMessage } from '../domain/messages/render'
 import {
@@ -26,8 +29,14 @@ const { publications, deals, channels, themes } = schema
 /** Antigüedad máxima de la comprobación de precio para publicar (doc. API: TTL ofertas 1 h). */
 export const PRICE_CHECK_MAX_AGE_MS = 60 * 60 * 1000
 
-/** Canales que publica el sistema (el resto son asistidos). */
-const AUTOMATIC_CHANNEL_TYPES: ChannelType[] = ['telegram']
+/** Bounds external calls per queue:tick invocation (Worker subrequest limit). */
+export const MAX_PUBLISH_PER_TICK = 10
+
+/**
+ * A scheduled WhatsApp publication overdue by more than this is not sent automatically: it may be an
+ * old assisted reminder the user already shared by hand (e.g. created before the gateway was set up).
+ */
+export const WHATSAPP_STALE_SCHEDULE_MS = 2 * QUEUE_TICK_MINUTES * 60 * 1000
 
 export class QueueError extends Error {
   constructor(
@@ -41,7 +50,7 @@ export class QueueError extends Error {
 
 export interface QueueContext {
   timezone: string
-  env: { TELEGRAM_BOT_TOKEN?: string }
+  env: ChannelEnv
   now?: number
 }
 
@@ -79,6 +88,7 @@ const queueColumns = {
   channelId: channels.id,
   channelName: channels.name,
   channelType: channels.type,
+  channelIdentifier: channels.identifier,
 }
 
 function baseQuery(db: Db) {
@@ -93,6 +103,7 @@ function baseQuery(db: Db) {
 export async function listQueue(
   db: Db,
   filter: { statuses: PublicationStatus[]; channelId?: string; themeId?: string; limit?: number },
+  env: ChannelEnv,
 ) {
   const conditions = [inArray(publications.status, filter.statuses)]
   if (filter.channelId) conditions.push(eq(publications.channelId, filter.channelId))
@@ -101,20 +112,26 @@ export async function listQueue(
     .where(and(...conditions))
     .orderBy(desc(sql`coalesce(${publications.publishedAt}, ${publications.scheduledAt}, ${deals.detectedAt})`), desc(deals.score))
     .limit(filter.limit ?? 200)
-  return rows.map(withActions)
+  return rows.map((row) => withActions(row, env))
 }
 
-export async function getQueueItem(db: Db, id: string) {
+export async function getQueueItem(db: Db, id: string, env: ChannelEnv) {
   const [row] = await baseQuery(db).where(eq(publications.id, id)).limit(1)
-  return row ? withActions(row) : null
+  return row ? withActions(row, env) : null
 }
 
-function withActions<T extends { status: PublicationStatus; needsReview: boolean; channelType: string }>(row: T) {
-  return { ...row, actions: availableActions(row.status, row.needsReview) }
+function withActions<
+  T extends { status: PublicationStatus; needsReview: boolean; channelType: ChannelType; channelIdentifier: string },
+>({ channelIdentifier, ...row }: T, env: ChannelEnv) {
+  return {
+    ...row,
+    automatic: isAutomaticChannel({ type: row.channelType, identifier: channelIdentifier }, env),
+    actions: availableActions(row.status, row.needsReview),
+  }
 }
 
-async function requireItem(db: Db, id: string) {
-  const item = await getQueueItem(db, id)
+async function requireItem(db: Db, id: string, env: ChannelEnv) {
+  const item = await getQueueItem(db, id, env)
   if (!item) throw new QueueError('Publicación no encontrada', 404)
   return item
 }
@@ -146,7 +163,7 @@ export async function applyAction(
   ctx: QueueContext,
 ) {
   const now = ctx.now ?? Date.now()
-  const item = await requireItem(db, id)
+  const item = await requireItem(db, id, ctx.env)
   const to = nextStatus(item.status, action)
   if (action !== 'discard') ensureNotExpired(item, now)
 
@@ -176,7 +193,7 @@ export async function applyAction(
     default:
       await setStatus(db, id, to)
   }
-  return requireItem(db, id)
+  return requireItem(db, id, ctx.env)
 }
 
 /** Siguiente hueco libre según franjas y límite diario de la temática en ese canal. */
@@ -219,7 +236,7 @@ async function suggestSlot(
  */
 export async function recheck(db: Db, id: string, ctx: QueueContext) {
   const now = ctx.now ?? Date.now()
-  const item = await requireItem(db, id)
+  const item = await requireItem(db, id, ctx.env)
   if (!OPEN_STATUSES.includes(item.status)) throw new QueueError('La publicación ya no está en la cola')
   ensureNotExpired(item, now)
 
@@ -229,14 +246,14 @@ export async function recheck(db: Db, id: string, ctx: QueueContext) {
   const [fresh] = await provider.refresh([item.asin], channel.trackingId)
   if (!fresh) {
     await setStatus(db, id, item.status, { needsReview: true, reviewReason: 'El producto ya no está disponible' })
-    return { ok: false as const, item: await requireItem(db, id) }
+    return { ok: false as const, item: await requireItem(db, id, ctx.env) }
   }
 
   const currentPrice = fresh.offer?.priceCents ?? null
   const reason = priceChangeReason(item.priceCentsShown, currentPrice)
   if (reason) {
     await setStatus(db, id, item.status, { needsReview: true, reviewReason: reason })
-    return { ok: false as const, item: await requireItem(db, id) }
+    return { ok: false as const, item: await requireItem(db, id, ctx.env) }
   }
 
   let text = item.text
@@ -258,7 +275,7 @@ export async function recheck(db: Db, id: string, ctx: QueueContext) {
     reviewReason: null,
     error: null,
   })
-  return { ok: true as const, item: await requireItem(db, id) }
+  return { ok: true as const, item: await requireItem(db, id, ctx.env) }
 }
 
 /**
@@ -266,8 +283,11 @@ export async function recheck(db: Db, id: string, ctx: QueueContext) {
  * desde la plantilla con los datos actuales (descuento, precio y hora de consulta).
  */
 export async function acceptReview(db: Db, id: string, ctx: QueueContext) {
-  const item = await requireItem(db, id)
+  const item = await requireItem(db, id, ctx.env)
   if (!item.needsReview) return item
+  if (item.reviewReason === UNCERTAIN_DELIVERY_REASON) {
+    throw new QueueError('Antes, confirma si el envío llegó al canal («Sí se envió» / «No se envió»)')
+  }
   const [channel, theme] = await Promise.all([
     db.query.channels.findFirst({ where: eq(channels.id, item.channelId) }),
     db.query.themes.findFirst({ where: eq(themes.id, item.themeId) }),
@@ -300,20 +320,71 @@ export async function acceptReview(db: Db, id: string, ctx: QueueContext) {
     needsReview: false,
     reviewReason: null,
   })
-  return requireItem(db, id)
+  return requireItem(db, id, ctx.env)
 }
 
 /**
- * Publica: recomprueba precio y, si no ha cambiado, envía (canales automáticos)
- * o marca como publicada (canales asistidos, tras compartir desde el panel).
+ * Rejects a publish whose intent does not match the channel mode, so "I already shared it" never
+ * sends through an automatic channel and "send" never just marks an assisted one as published.
  */
-export async function publish(db: Db, id: string, ctx: QueueContext) {
+export function assertPublishIntent(mode: 'automatic' | 'assisted', intent: PublishIntent) {
+  if (intent === 'mark' && mode === 'automatic') {
+    throw new QueueError('Este canal se publica automáticamente: usa «Publicar ya» (no se ha marcado nada)')
+  }
+  if (intent === 'send' && mode === 'assisted') {
+    throw new QueueError('Este canal se publica a mano: compártelo y márcalo como publicado')
+  }
+}
+
+/**
+ * What a failed send leaves on the publication. An uncertain delivery goes to review so
+ * "Publicar ya" is blocked until the user checks the channel (no duplicate by hand).
+ */
+export function sendFailure(error: unknown) {
+  const message = (error as Error).message
+  if (error instanceof UncertainDeliveryError) {
+    return {
+      update: { error: message, needsReview: true, reviewReason: UNCERTAIN_DELIVERY_REASON },
+      message: `${UNCERTAIN_DELIVERY_REASON} (${message})`,
+    }
+  }
+  return { update: { error: message }, message: `No se pudo publicar: ${message}` }
+}
+
+/**
+ * Resolves an uncertain send after the user checked the channel: `delivered` marks it published
+ * without sending; otherwise it clears the review (text untouched) so it can be published again.
+ */
+export async function resolveDelivery(db: Db, id: string, delivered: boolean, ctx: QueueContext) {
   const now = ctx.now ?? Date.now()
-  let item = await requireItem(db, id)
+  const item = await requireItem(db, id, ctx.env)
+  if (!item.needsReview || item.reviewReason !== UNCERTAIN_DELIVERY_REASON) {
+    throw new QueueError('Esta publicación no tiene un envío pendiente de confirmar')
+  }
+  if (delivered) {
+    // It may have expired while waiting for confirmation; it did reach the channel, so record it.
+    if (item.status !== 'caducada') nextStatus(item.status, 'publish')
+    await setStatus(db, id, 'publicada', { publishedAt: now, needsReview: false, reviewReason: null, error: null })
+  } else {
+    await setStatus(db, id, item.status, { needsReview: false, reviewReason: null, error: null })
+  }
+  return requireItem(db, id, ctx.env)
+}
+
+/**
+ * Publica: recomprueba precio y, si no ha cambiado, envía (canales automáticos, intent `send`)
+ * o marca como publicada (canales asistidos tras compartir, intent `mark`).
+ */
+export async function publish(db: Db, id: string, ctx: QueueContext, intent: PublishIntent) {
+  const now = ctx.now ?? Date.now()
+  let item = await requireItem(db, id, ctx.env)
   nextStatus(item.status, 'publish')
   if (item.needsReview) throw new QueueError(`Pendiente de revisión: ${item.reviewReason ?? 'cambio de precio'}`)
 
-  const adapter = getChannelAdapter(item.channelType, ctx.env)
+  const channel = await db.query.channels.findFirst({ where: eq(channels.id, item.channelId) })
+  if (!channel) throw new QueueError('Canal no encontrado', 404)
+  const adapter = getChannelAdapter(channel, ctx.env)
+  assertPublishIntent(adapter.mode, intent)
   const priceIsFresh = item.priceCheckedAt != null && now - item.priceCheckedAt < PRICE_CHECK_MAX_AGE_MS
   if (adapter.mode === 'automatic' || (item.priceCentsShown != null && !priceIsFresh)) {
     const result = await recheck(db, id, ctx)
@@ -326,17 +397,44 @@ export async function publish(db: Db, id: string, ctx: QueueContext) {
 
   let externalId: string | null = null
   if (adapter.mode === 'automatic' && adapter.publish) {
-    const channel = await db.query.channels.findFirst({ where: eq(channels.id, item.channelId) })
-    if (!channel) throw new QueueError('Canal no encontrado', 404)
     try {
       externalId = (await adapter.publish(channel, { text: item.text, link: item.link })).externalId
     } catch (error) {
-      await setStatus(db, id, item.status, { error: (error as Error).message })
-      throw new QueueError(`No se pudo publicar: ${(error as Error).message}`, 502)
+      const failure = sendFailure(error)
+      await setStatus(db, id, item.status, failure.update)
+      throw new QueueError(failure.message, 502)
     }
   }
   await setStatus(db, id, 'publicada', { publishedAt: now, externalId, error: null })
-  return { published: true as const, item: await requireItem(db, id) }
+  return { published: true as const, item: await requireItem(db, id, ctx.env) }
+}
+
+/**
+ * Chooses which due scheduled publications this tick sends: only automatic channels, oldest first,
+ * at most MAX_PUBLISH_PER_TICK (the rest stay scheduled for the next tick). WhatsApp items overdue by
+ * more than WHATSAPP_STALE_SCHEDULE_MS are returned as `stale` and never sent automatically.
+ */
+export function planDuePublications(
+  rows: { id: string; scheduledAt: number | null; channelType: ChannelType; channelIdentifier: string }[],
+  env: ChannelEnv,
+  now: number,
+) {
+  const stale: string[] = []
+  const sendable: typeof rows = []
+  for (const row of rows) {
+    if (!isAutomaticChannel({ type: row.channelType, identifier: row.channelIdentifier }, env)) continue
+    if (row.channelType === 'whatsapp' && now - (row.scheduledAt ?? now) > WHATSAPP_STALE_SCHEDULE_MS) {
+      stale.push(row.id)
+      continue
+    }
+    sendable.push(row)
+  }
+  sendable.sort((a, b) => (a.scheduledAt ?? 0) - (b.scheduledAt ?? 0))
+  return {
+    send: sendable.slice(0, MAX_PUBLISH_PER_TICK).map((r) => r.id),
+    stale,
+    deferred: Math.max(0, sendable.length - MAX_PUBLISH_PER_TICK),
+  }
 }
 
 /** Tarea periódica: caduca, publica lo programado vencido y purga datos de más de 24 h. */
@@ -353,8 +451,13 @@ export async function tick(db: Db, log: RunLog, ctx: QueueContext) {
   log.count('caducadas', expired.length)
 
   // 2. Publicar lo programado (solo canales automáticos y sin revisión pendiente)
-  const due = await db
-    .select({ id: publications.id })
+  const dueRows = await db
+    .select({
+      id: publications.id,
+      scheduledAt: publications.scheduledAt,
+      channelType: channels.type,
+      channelIdentifier: channels.identifier,
+    })
     .from(publications)
     .innerJoin(channels, eq(publications.channelId, channels.id))
     .where(
@@ -362,13 +465,20 @@ export async function tick(db: Db, log: RunLog, ctx: QueueContext) {
         eq(publications.status, 'programada'),
         lte(publications.scheduledAt, now),
         eq(publications.needsReview, false),
-        inArray(channels.type, AUTOMATIC_CHANNEL_TYPES),
         eq(channels.active, true),
       ),
     )
-  for (const { id } of due) {
+  const plan = planDuePublications(dueRows, ctx.env, now)
+  for (const id of plan.stale) {
+    await setStatus(db, id, 'aprobada', {
+      scheduledAt: null,
+      error: 'Programada para WhatsApp con más de 20 min de retraso: no se envía sola por si ya se compartió a mano. Revísala y publícala.',
+    })
+    log.count('whatsapp_vencidas')
+  }
+  for (const id of plan.send) {
     try {
-      const result = await publish(db, id, ctx)
+      const result = await publish(db, id, ctx, 'send')
       log.count(result.published ? 'publicadas' : 'a_revision')
     } catch (error) {
       // Se devuelve a «aprobada» para no reintentar cada 10 minutos; el error queda visible.
@@ -377,6 +487,7 @@ export async function tick(db: Db, log: RunLog, ctx: QueueContext) {
       log.error(`Publicación ${id.slice(0, 8)}: ${message}`)
     }
   }
+  if (plan.deferred) log.count('aplazadas', plan.deferred)
 
   // 3. Purgar contenido de producto de más de 24 h que no se publicó (Licencia: caché ≤ 24 h).
   //    Lo publicado se conserva: es el texto de nuestro propio mensaje.

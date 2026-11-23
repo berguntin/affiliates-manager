@@ -17,5 +17,5 @@ export default defineEventHandler(async (event) => {
   const parsed = querySchema.safeParse(getQuery(event))
   if (!parsed.success) throw createError({ statusCode: 400, message: 'Filtro no válido' })
   const { status, ...rest } = parsed.data
-  return listQueue(useDb(), { statuses: status, ...rest })
+  return listQueue(useDb(), { statuses: status, ...rest }, useEnv())
 })

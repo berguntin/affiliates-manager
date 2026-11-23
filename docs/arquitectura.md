@@ -42,7 +42,7 @@ server/
 │  └─ messages/        motor de plantillas, formatos Telegram/WhatsApp, línea de avisos, entradilla IA
 ├─ providers/      ProductProvider + implementaciones (manual, mock; creators-api en fase 2)
 │  └─ history/       PriceHistoryProvider (null; Keepa en el futuro)
-├─ channels/       ChannelAdapter + telegram (automático) y whatsapp (asistido)
+├─ channels/       ChannelAdapter + telegram (automático) y whatsapp (asistido, o automático por pasarela §14.11)
 ├─ db/             esquema Drizzle, cliente D1, repositorios
 ├─ services/       orquestación con E/S: scan, publish, expire, runs (registro de ejecuciones)
 ├─ api/            endpoints REST del panel (validación con zod)
@@ -125,7 +125,7 @@ runs (registro de ejecuciones) · settings (clave/valor, sin secretos)
 | Tabla | Campos principales |
 |---|---|
 | `themes` | `id`, `name`, `slug`, `description`, `active`, `search_index`, `keywords` (JSON), `browse_nodes` (JSON), `exclude_keywords` (JSON), `exclude_brands` (JSON), `min_discount_pct`, `min_price_cents`, `max_price_cents`, `min_rating` (1–4), `min_reviews` (informativo), `daily_limit`, `publish_windows` (JSON `[{days:[1..7], start:"09:00", end:"11:30"}]`), `dedupe_days`, `tone`, `provider` (`mock`/`manual`/`creators_api`), `created_at`, `updated_at` |
-| `channels` | `id`, `type` (`telegram`/`whatsapp`), `name`, `identifier` (`@canal` o `-100…` / URL del canal de WhatsApp), `tracking_id`, `active`, `created_at`, `updated_at` |
+| `channels` | `id`, `type` (`telegram`/`whatsapp`), `name`, `identifier` (`@canal` o `-100…` / URL del canal de WhatsApp, o id `…@newsletter` de la pasarela para publicación automática), `tracking_id`, `active`, `created_at`, `updated_at` |
 | `theme_channels` | `theme_id`, `channel_id` (PK compuesta) |
 | `manual_products` | `id`, `theme_id`, `asin`, `title`, `brand`, `note` (texto propio), `internal_price_cents` (**nota interna, nunca se publica**), `created_at` |
 | `deals` | `id`, `theme_id`, `asin`, `source`, `detected_at`, `expires_at` (= detectada + 24 h, o el fin de la oferta flash si es antes), datos de la instantánea (`title`, `brand`, `image_url`, `price_cents`, `saving_basis_cents`, `saving_basis_type`, `savings_pct`, `deal_type`, `deal_ends_at`), evaluación (`effective_discount_pct`, `reliability`, `suspicious`, `reasons` JSON, `score`), `intro` (entradilla con IA), `purged_at` |
@@ -165,7 +165,8 @@ candidata/aprobada/programada ──(expires_at)──► caducada
   - Sin precio (manual), no hay nada que recomprobar.
 - **Programar**: en la hora indicada o en el **siguiente hueco libre** dentro de las franjas de la temática, respetando el límite diario y una separación mínima. No se puede programar más allá de `expires_at`.
 - **Telegram**: `sendMessage` con `parse_mode: HTML`, `link_preview_options` (URL del producto, imagen grande, encima del texto) y un botón *Ver en Amazon*.
-- **WhatsApp asistido**: la vista de la publicación ofrece *Compartir* (`navigator.share({ text })`), *Copiar texto* y *Marcar como publicada*. Se compartirá solo texto, y WhatsApp generará la vista previa.
+- **WhatsApp automático (opcional, SPEC §14.11)**: con `WHATSAPP_GATEWAY_TOKEN`, `WhatsAppGatewayAdapter` envía el texto al Canal (`…@newsletter`) por la pasarela HTTP (`POST /messages/text`), y la cola lo trata como Telegram.
+- **WhatsApp asistido** (sin pasarela): la vista de la publicación ofrece *Compartir* (`navigator.share({ text })`), *Copiar texto* y *Marcar como publicada*. Se compartirá solo texto, y WhatsApp generará la vista previa.
 
 ## 6. Mensajes
 

@@ -17,6 +17,10 @@ export interface AppEnv {
   /** Solo para pruebas locales: base alternativa de la Bot API. */
   TELEGRAM_API_BASE?: string
   ANTHROPIC_API_KEY?: string
+  /** Unofficial WhatsApp gateway token (SPEC §14.11). If set, WhatsApp channels publish automatically. */
+  WHATSAPP_GATEWAY_TOKEN?: string
+  /** Gateway base URL (default https://gate.whapi.cloud). */
+  WHATSAPP_GATEWAY_URL?: string
 }
 
 /**

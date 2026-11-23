@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RELIABILITY_LABELS, STATUS_LABELS, type QueueItem } from '#shared/api'
+import { RELIABILITY_LABELS, STATUS_LABELS, UNCERTAIN_DELIVERY_REASON, type QueueItem } from '#shared/api'
 import { QUEUE_TICK_MINUTES, alignToTick, nextTick } from '#shared/queue-cycle'
 
 const props = defineProps<{ item: QueueItem; readonly?: boolean }>()
@@ -9,6 +9,8 @@ const toast = useToast()
 const { run, pending } = useApiAction()
 
 const isTelegram = computed(() => props.item.channelType === 'telegram')
+/** Decided by the server per channel: the system sends it, otherwise the user shares it. */
+const isAutomatic = computed(() => props.item.automatic)
 const preview = computed(() => messageToHtml(props.item.text, props.item.channelType))
 const can = (action: QueueItem['actions'][number]) => !props.readonly && props.item.actions.includes(action)
 
@@ -104,17 +106,41 @@ async function acceptReview() {
   if (updated) emit('changed', updated)
 }
 
-// --- Publicar (Telegram) ---
+// --- Uncertain send: the user checks the channel and says whether it arrived ---
+const uncertainDelivery = computed(() => props.item.needsReview && props.item.reviewReason === UNCERTAIN_DELIVERY_REASON)
+async function resolveDelivery(delivered: boolean) {
+  const updated = await run(
+    () =>
+      apiFetch<QueueItem>(`/api/publications/${props.item.id}/delivery`, { method: 'POST', body: { delivered } }),
+    delivered ? 'Marcada como publicada' : 'Lista para volver a publicar',
+  )
+  if (updated) emit('changed', updated)
+}
+const reviewActions = computed(() => {
+  if (props.readonly) return []
+  if (uncertainDelivery.value) {
+    return [
+      { label: 'Sí se envió', color: 'warning' as const, variant: 'solid' as const, onClick: () => resolveDelivery(true) },
+      { label: 'No se envió', color: 'neutral' as const, variant: 'outline' as const, onClick: () => resolveDelivery(false) },
+    ]
+  }
+  return [{ label: 'Usar precio actual', color: 'warning' as const, variant: 'solid' as const, onClick: acceptReview }]
+})
+
+// --- Publish now (automatic channels: Telegram, or WhatsApp through the gateway) ---
 async function publishNow() {
   if (!confirm(`¿Publicar ahora en ${props.item.channelName}?`)) return
   const result = await run(() =>
-    apiFetch<{ published: boolean; item: QueueItem }>(`/api/publications/${props.item.id}/publish`, { method: 'POST' }),
+    apiFetch<{ published: boolean; item: QueueItem }>(`/api/publications/${props.item.id}/publish`, {
+      method: 'POST',
+      body: { intent: 'send' },
+    }),
   )
   if (!result) return
   emit('changed', result.item)
   toast.add(
     result.published
-      ? { title: 'Publicada en Telegram', color: 'success', icon: 'i-lucide-check' }
+      ? { title: `Publicada en ${isTelegram.value ? 'Telegram' : 'WhatsApp'}`, color: 'success', icon: 'i-lucide-check' }
       : { title: 'Requiere revisión', description: result.item.reviewReason ?? undefined, color: 'warning' },
   )
 }
@@ -158,7 +184,10 @@ async function copy() {
 }
 async function markPublished() {
   const result = await run(() =>
-    apiFetch<{ published: boolean; item: QueueItem }>(`/api/publications/${props.item.id}/publish`, { method: 'POST' }),
+    apiFetch<{ published: boolean; item: QueueItem }>(`/api/publications/${props.item.id}/publish`, {
+      method: 'POST',
+      body: { intent: 'mark' },
+    }),
   )
   if (!result) return
   emit('changed', result.item)
@@ -198,7 +227,7 @@ async function markPublished() {
       <UBadge v-if="item.suspicious" label="Sospechosa" color="error" variant="subtle" icon="i-lucide-triangle-alert" />
       <UBadge
         v-if="item.status === 'programada' && item.scheduledAt"
-        :label="isTelegram ? `Se publica ${formatDateTime(item.scheduledAt)}` : `Recordatorio ${formatDateTime(item.scheduledAt)} (publicación manual)`"
+        :label="isAutomatic ? `Se publica ${formatDateTime(item.scheduledAt)}` : `Recordatorio ${formatDateTime(item.scheduledAt)} (publicación manual)`"
         color="info"
         variant="subtle"
         icon="i-lucide-clock"
@@ -230,7 +259,7 @@ async function markPublished() {
       icon="i-lucide-badge-alert"
       title="Requiere revisión"
       :description="item.reviewReason ?? 'El precio ha cambiado'"
-      :actions="readonly ? [] : [{ label: 'Usar precio actual', color: 'warning', variant: 'solid', onClick: acceptReview }]"
+      :actions="reviewActions"
     />
     <UAlert v-if="item.error" color="error" variant="subtle" icon="i-lucide-circle-x" :description="item.error" />
 
@@ -243,7 +272,7 @@ async function markPublished() {
     <div v-if="!readonly && item.actions.length" class="flex flex-wrap gap-2">
       <template v-if="!item.needsReview">
         <UButton
-          v-if="can('publish') && isTelegram"
+          v-if="can('publish') && isAutomatic"
           label="Publicar ya"
           icon="i-lucide-send"
           size="sm"
@@ -251,7 +280,7 @@ async function markPublished() {
           @click="publishNow"
         />
         <UButton
-          v-if="can('publish') && !isTelegram"
+          v-if="can('publish') && !isAutomatic"
           label="Compartir en WhatsApp"
           icon="i-lucide-share-2"
           size="sm"
@@ -327,7 +356,7 @@ async function markPublished() {
           La cola publica cada {{ QUEUE_TICK_MINUTES }} minutos (:00, :10, :20…), así que las horas se ajustan al
           ciclo siguiente.
           Debe publicarse antes de que caduque ({{ formatDateTime(item.expiresAt) }}).
-          <template v-if="!isTelegram">En WhatsApp te avisará la cola, pero la publicación es manual.</template>
+          <template v-if="!isAutomatic">En WhatsApp te avisará la cola, pero la publicación es manual.</template>
         </p>
       </template>
       <template #footer>

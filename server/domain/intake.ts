@@ -230,6 +230,8 @@ export interface QueuedPublicationView {
   id: string
   channelName: string
   channelType: 'telegram' | 'whatsapp'
+  /** The system publishes this channel (default: only Telegram). */
+  automatic?: boolean
   status: string
   needsReview: boolean
   reviewReason: string | null
@@ -271,7 +273,7 @@ export function queuedCard(
 
     if (!OPEN.includes(p.status) || p.needsReview) continue
     const short = p.channelName.length > 18 ? `${p.channelName.slice(0, 17)}…` : p.channelName
-    if (p.channelType === 'telegram') {
+    if (p.automatic ?? p.channelType === 'telegram') {
       const row: InlineButton[] = [
         { text: `🚀 ${short}`, callback_data: encodeCallback({ kind: 'publish', publicationId: p.id }) },
       ]

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const { data: channels, status } = await useFetch('/api/channels')
+const { whatsappGateway, isAutomatic } = useChannelModes()
 </script>
 
 <template>
@@ -17,7 +18,7 @@ const { data: channels, status } = await useFetch('/api/channels')
       v-else-if="!channels?.length"
       icon="i-lucide-send"
       title="Aún no hay canales"
-      description="Añade un canal de Telegram (publicación automática) o de WhatsApp (asistida)."
+      :description="`Añade un canal de Telegram (publicación automática) o de WhatsApp (${whatsappGateway ? 'automática por pasarela o asistida' : 'asistida'}).`"
     />
 
     <div v-else class="space-y-2">
@@ -32,7 +33,7 @@ const { data: channels, status } = await useFetch('/api/channels')
               <div class="min-w-0">
                 <p class="font-medium">{{ channel.name }}</p>
                 <p class="truncate text-sm text-muted">
-                  {{ channel.type === 'telegram' ? 'Telegram · automático' : 'WhatsApp · asistido' }} ·
+                  {{ channel.type === 'telegram' ? 'Telegram · automático' : isAutomatic(channel) ? 'WhatsApp · automático (pasarela)' : 'WhatsApp · asistido' }} ·
                   tag {{ channel.trackingId }}
                 </p>
               </div>

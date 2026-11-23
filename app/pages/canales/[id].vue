@@ -32,17 +32,21 @@ if (!isNew.value) {
   })
 }
 
-const typeItems = [
+const { whatsappGateway } = useChannelModes()
+const typeItems = computed(() => [
   { label: 'Telegram (publicación automática)', value: 'telegram' },
-  { label: 'WhatsApp (publicación asistida)', value: 'whatsapp' },
-]
+  {
+    label: whatsappGateway.value ? 'WhatsApp (automática por pasarela o asistida)' : 'WhatsApp (publicación asistida)',
+    value: 'whatsapp',
+  },
+])
 
 const themeItems = computed(() => (themes.value ?? []).map((t) => ({ label: t.name, value: t.id })))
 
 const identifierHelp = computed(() =>
   state.type === 'telegram'
     ? '@nombre_del_canal o id numérico (-100…). El bot debe ser administrador del canal.'
-    : 'Enlace del canal de WhatsApp (solo informativo; la publicación es manual).',
+    : 'Automática: id del canal en la pasarela (…@newsletter), con WHATSAPP_GATEWAY_TOKEN y el número de la pasarela como administrador. Asistida: enlace del canal (solo informativo).',
 )
 
 const legalUrl = computed({
