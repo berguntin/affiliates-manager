@@ -108,6 +108,12 @@ export const manualProducts = sqliteTable(
     /** Precio de referencia visto en Amazon (tachado o PVP recomendado) para mostrar el descuento. */
     basisPriceCents: integer('basis_price_cents'),
     basisType: text('basis_type').$type<ManualBasisType>(),
+    /**
+     * The user's own Amazon short link (amzn.to…) and the tracking ID it resolves to:
+     * used verbatim as the link on channels with that tracking ID.
+     */
+    affiliateUrl: text('affiliate_url'),
+    affiliateTag: text('affiliate_tag'),
     /** Se marca al convertirlo en candidata. */
     consumedAt: timestamp('consumed_at'),
     createdAt: timestamp('created_at').notNull().default(now),
@@ -235,6 +241,12 @@ export const intakeDrafts = sqliteTable(
     basisType: text('basis_type').$type<ManualBasisType>(),
     /** Características leídas de Amazon; van en viñetas tras el comentario. */
     features: jsonList('features'),
+    /**
+     * The user's own Amazon short link (amzn.to…) and the tracking ID it resolves to:
+     * used verbatim as the link on channels with that tracking ID.
+     */
+    affiliateUrl: text('affiliate_url'),
+    affiliateTag: text('affiliate_tag'),
     themeId: text('theme_id').references(() => themes.id, { onDelete: 'set null' }),
     publicationIds: jsonList('publication_ids'),
     queuedAt: timestamp('queued_at'),

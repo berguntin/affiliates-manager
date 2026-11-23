@@ -169,6 +169,8 @@ export interface DraftView {
   basisPriceCents?: number | null
   basisType?: 'WAS_PRICE' | 'LIST_PRICE' | null
   features?: string[]
+  /** Tracking ID of the user's own short link, kept as the message link on matching channels. */
+  affiliateTag?: string | null
 }
 
 /** Descuento del borrador: solo si el precio de referencia es mayor que el precio. */
@@ -203,6 +205,9 @@ export function draftCard(
     `Precio: ${price}`,
     `Comentario: ${draft.note ? esc(draft.note) : '—'}`,
   ]
+  if (draft.affiliateTag) {
+    lines.push(`🔗 Se usará tu enlace de afiliado (tag <code>${esc(draft.affiliateTag)}</code>) en los canales con ese tracking ID; en los demás, el enlace estándar`)
+  }
   if (bullets) lines.push('', esc(bullets))
   if (opts.warning) lines.push('', `⚠️ ${esc(opts.warning)}`)
   lines.push(

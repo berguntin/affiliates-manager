@@ -23,7 +23,17 @@ export function manualProductSource(db: Db): ManualProductSource {
         .where(inArray(manualProducts.asin, asins))
         .orderBy(desc(manualProducts.createdAt))
       const seen = new Set<string>()
-      return rows.filter((r) => !seen.has(r.asin) && seen.add(r.asin))
+      // Keep the most recent own short link of the ASIN, so a later add without one
+      // (or in another theme) does not swap the link of queued publications.
+      const ownLink = new Map<string, { affiliateUrl: string; affiliateTag: string }>()
+      for (const r of rows) {
+        if (r.affiliateUrl && r.affiliateTag && !ownLink.has(r.asin)) {
+          ownLink.set(r.asin, { affiliateUrl: r.affiliateUrl, affiliateTag: r.affiliateTag })
+        }
+      }
+      return rows
+        .filter((r) => !seen.has(r.asin) && seen.add(r.asin))
+        .map((r) => ({ ...r, ...ownLink.get(r.asin) }))
     },
   }
 }
@@ -39,6 +49,8 @@ export async function addManualProduct(
     priceCents: number | null
     basisPriceCents?: number | null
     basisType?: ManualBasisType | null
+    affiliateUrl?: string | null
+    affiliateTag?: string | null
   },
 ) {
   const id = crypto.randomUUID()

@@ -57,6 +57,13 @@
       "when": 1791926035242,
       "tag": "0007_theme_emoji",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1795429830929,
+      "tag": "0008_affiliate_short_link",
+      "breakpoints": true
     }
   ]
 }

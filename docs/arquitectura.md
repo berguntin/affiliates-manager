@@ -108,7 +108,7 @@ interface ChannelAdapter {
 ```
 
 - `MockProvider` genera respuestas con **la forma JSON real de OffersV2** y las pasa por el mismo *mapper* (`fromCreatorsItem`) que usará `CreatorsApiProvider`. Es determinista: semilla = temática + fecha.
-- `ManualProvider` lee los productos dados de alta en el panel (tabla `manual_products`). Construye el enlace estándar `https://www.amazon.es/dp/<ASIN>?tag=<tracking>` y siempre devuelve `offer: null`.
+- `ManualProvider` lee los productos dados de alta en el panel (tabla `manual_products`). Construye el enlace estándar `https://www.amazon.es/dp/<ASIN>?tag=<tracking>` y siempre devuelve `offer: null`. Exception: if the user pasted an Amazon-owned short link (`amzn.to`, `amzn.eu`, `a.co`, `*.amazon`) whose redirect carries a `tag`, that short link is stored (`affiliate_url`, `affiliate_tag`) and used verbatim on channels whose tracking ID equals the tag (`manualLink` in `server/domain/affiliate.ts`).
 
 ## 4. Modelo de datos (D1)
 
